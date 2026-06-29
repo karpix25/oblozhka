@@ -46,7 +46,7 @@ export async function sendTemplateGallery(
   }
 
   await ctx.replyWithPhoto(new InputFile(templatePreviewPath(template.slug)), {
-    caption: templateCaption(template, page, templates.length, input.mode),
+    caption: templateCaption(template, page, templates.length),
     reply_markup: keyboard
   });
 }
@@ -82,15 +82,11 @@ function templateGalleryKeyboard(input: {
   return keyboard;
 }
 
-function templateCaption(template: TemplateCard, page: number, total: number, mode: GalleryMode) {
+function templateCaption(template: TemplateCard, page: number, total: number) {
   return [
-    `${platformLabels[template.platform]} · шаблон ${page + 1}/${total}`,
+    `${platformLabels[template.platform]} · ${page + 1}/${total}`,
     "",
-    template.title,
-    "",
-    template.promptRules,
-    "",
-    mode === "select" ? "Листайте варианты или выберите этот шаблон." : "Листайте библиотеку или начните новый проект."
+    template.title
   ].join("\n");
 }
 
