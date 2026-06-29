@@ -31,11 +31,11 @@ import {
   hookPrompt,
   howItWorksMessage,
   referencePrompt,
-  startMessage,
   supportMessage,
   termsMessage,
   topicPrompt
 } from "./messages.js";
+import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
 import { generationQueue } from "./queue.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
@@ -53,7 +53,7 @@ registerProjectHandlers(bot, token);
 
 bot.command("start", async (ctx) => {
   await upsertTelegramUser(prisma, profileFromContext(ctx));
-  await ctx.reply(startMessage(ctx.from?.first_name), { reply_markup: mainKeyboard() });
+  await sendOnboarding(ctx, ctx.from?.first_name);
 });
 
 bot.command("terms", async (ctx) => ctx.reply(termsMessage()));
@@ -74,7 +74,7 @@ bot.callbackQuery("support", async (ctx) => {
 bot.callbackQuery("home", async (ctx) => {
   resetWizard(ctx);
   await ctx.answerCallbackQuery();
-  await ctx.reply(startMessage(ctx.from.first_name), { reply_markup: mainKeyboard() });
+  await sendOnboarding(ctx, ctx.from.first_name);
 });
 
 bot.callbackQuery("how", async (ctx) => {

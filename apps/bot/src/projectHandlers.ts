@@ -11,16 +11,16 @@ import {
 } from "@covers/db";
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
-import { mainKeyboard, platformKeyboard, sourceTypeKeyboard, templatesKeyboard } from "./keyboards.js";
+import { mainKeyboard, platformKeyboard, sourceTypeKeyboard } from "./keyboards.js";
 import {
   platformPrompt,
   referenceForGenerationPrompt,
   sourcePrompt,
   sourceStartMessage,
-  templatePrompt
 } from "./messages.js";
 import { generationQueue, hookQueue } from "./queue.js";
 import { type BotContext, resetWizard } from "./session.js";
+import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
 
 export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
@@ -46,9 +46,27 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
   });
 
   bot.callbackQuery("templates:library", async (ctx) => {
-    const templates = await listTemplates(prisma);
     await ctx.answerCallbackQuery();
-    await ctx.reply(["Библиотека шаблонов:", "", ...templates.map((template) => `• ${template.title} — ${template.platform}`)].join("\n"));
+    const platform = "YOUTUBE";
+    const templates = await listTemplates(prisma, platform);
+    await sendTemplateGallery(ctx, templates, { mode: "browse", platform });
+  });
+
+  bot.callbackQuery(/^templates:browse:(YOUTUBE|INSTAGRAM_TIKTOK|FACELESS):(-?\d+)$/, async (ctx) => {
+    const platform = ctx.match[1] as ProjectPlatform;
+    const page = Number(ctx.match[2]);
+    const templates = await listTemplates(prisma, platform);
+    await ctx.answerCallbackQuery();
+    await sendTemplateGallery(ctx, templates, {
+      mode: ctx.session.projectId ? "select" : "browse",
+      platform,
+      page,
+      replace: true
+    });
+  });
+
+  bot.callbackQuery("templates:noop", async (ctx) => {
+    await ctx.answerCallbackQuery();
   });
 
   bot.callbackQuery(/^source:(LINK|VIDEO|TRANSCRIPT)$/, async (ctx) => {
@@ -67,7 +85,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     await setProjectPlatform(prisma, ctx.session.projectId, platform);
     const templates = await listTemplates(prisma, platform);
     await ctx.answerCallbackQuery();
-    await ctx.reply(templatePrompt(), { reply_markup: templatesKeyboard(templates) });
+    await sendTemplateGallery(ctx, templates, { mode: "select", platform });
   });
 
   bot.callbackQuery(/^template:(.+)$/, async (ctx) => {
