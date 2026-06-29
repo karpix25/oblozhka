@@ -95,7 +95,7 @@ function templateCaption(template: TemplateCard, page: number, total: number, mo
 }
 
 function platformTab(label: string, active: boolean) {
-  return active ? `[${label}]` : label;
+  return active ? `🟡 ${label}` : label;
 }
 
 function normalizePage(page: number, total: number) {

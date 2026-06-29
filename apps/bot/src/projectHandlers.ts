@@ -18,6 +18,7 @@ import {
   sourcePrompt,
   sourceStartMessage,
 } from "./messages.js";
+import { deleteCallbackMessage } from "./navigation.js";
 import { generationQueue, hookQueue } from "./queue.js";
 import { type BotContext, resetWizard } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
@@ -27,6 +28,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
   bot.callbackQuery("project:start", async (ctx) => {
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
     await ctx.reply(sourceStartMessage(), { reply_markup: sourceTypeKeyboard() });
   });
 
@@ -34,6 +36,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
     const projects = await listUserProjects(prisma, user.id);
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
     if (projects.length === 0) {
       await ctx.reply("Пока нет проектов. Начните с кнопки «Новый проект».", { reply_markup: mainKeyboard() });
       return;
@@ -47,6 +50,8 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
 
   bot.callbackQuery("templates:library", async (ctx) => {
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+    ctx.session.templateGalleryMode = "browse";
     const platform = "YOUTUBE";
     const templates = await listTemplates(prisma, platform);
     await sendTemplateGallery(ctx, templates, { mode: "browse", platform });
@@ -58,7 +63,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     const templates = await listTemplates(prisma, platform);
     await ctx.answerCallbackQuery();
     await sendTemplateGallery(ctx, templates, {
-      mode: ctx.session.projectId ? "select" : "browse",
+      mode: ctx.session.templateGalleryMode ?? "browse",
       platform,
       page,
       replace: true
@@ -73,6 +78,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     const sourceType = ctx.match[1] as SourceType;
     ctx.session.step = sourceType === "LINK" ? "sourceLink" : sourceType === "VIDEO" ? "sourceVideo" : "sourceTranscript";
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
     await ctx.reply(sourcePrompt(sourceType));
   });
 
@@ -85,6 +91,8 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     await setProjectPlatform(prisma, ctx.session.projectId, platform);
     const templates = await listTemplates(prisma, platform);
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+    ctx.session.templateGalleryMode = "select";
     await sendTemplateGallery(ctx, templates, { mode: "select", platform });
   });
 
@@ -94,8 +102,10 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
       return;
     }
     await setProjectTemplate(prisma, ctx.session.projectId, ctx.match[1]);
+    ctx.session.templateGalleryMode = undefined;
     await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId, userTelegramId: ctx.from.id }, { jobId: `${ctx.session.projectId}:hooks` });
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
     await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
   });
 
@@ -106,6 +116,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     ctx.session.projectId = projectId;
     ctx.session.step = "referenceUpload";
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
     await ctx.reply(referenceForGenerationPrompt());
   });
 

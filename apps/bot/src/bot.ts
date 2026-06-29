@@ -35,6 +35,7 @@ import {
   termsMessage,
   topicPrompt
 } from "./messages.js";
+import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
 import { generationQueue } from "./queue.js";
@@ -63,28 +64,33 @@ bot.command("paysupport", async (ctx) => ctx.reply(supportMessage()));
 bot.callbackQuery("balance", async (ctx) => {
   const user = await findUserByTelegramId(prisma, ctx.from.id);
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply(`Ваш баланс: ${user?.balance ?? 0} кредитов`);
 });
 
 bot.callbackQuery("support", async (ctx) => {
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply(supportMessage());
 });
 
 bot.callbackQuery("home", async (ctx) => {
   resetWizard(ctx);
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await sendOnboarding(ctx, ctx.from.first_name);
 });
 
 bot.callbackQuery("how", async (ctx) => {
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply(howItWorksMessage(), { reply_markup: mainKeyboard() });
 });
 
 bot.callbackQuery("packages", async (ctx) => {
   const packages = await listActivePackages(prisma);
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   if (packages.length === 0) {
     await ctx.reply("Пакеты кредитов пока не настроены.");
     return;
@@ -118,6 +124,7 @@ bot.callbackQuery(/^buy:(.+)$/, async (ctx) => {
   });
 
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.api.sendInvoice(ctx.chat!.id, invoice.title, invoice.description, invoice.payload, invoice.currency, invoice.prices);
 });
 
@@ -141,6 +148,7 @@ bot.callbackQuery("generate:start", async (ctx) => {
   resetWizard(ctx);
   ctx.session.draft = {};
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply("Выберите основу для обложки:", { reply_markup: referenceModeKeyboard() });
 });
 
@@ -148,11 +156,13 @@ bot.callbackQuery(/^quick:(YOUTUBE|VERTICAL)$/, async (ctx) => {
   resetWizard(ctx);
   ctx.session.draft = { format: ctx.match[1] as CoverFormat };
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply("Выберите основу для обложки:", { reply_markup: referenceModeKeyboard() });
 });
 
 bot.callbackQuery("refmode:SOON", async (ctx) => {
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply("Для текущей модели нужен стартовый образ. Выберите «С моим фото» или «По референсу».", {
     reply_markup: referenceModeKeyboard()
   });
@@ -162,6 +172,7 @@ bot.callbackQuery(/^refmode:(FACE|REFERENCE|NONE)$/, async (ctx) => {
   const referenceMode = ctx.match[1] as ReferenceMode;
   ctx.session.draft = { ...ctx.session.draft, referenceMode };
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
 
   if (referenceMode === "NONE") {
     await askFormatOrTopic(ctx);
@@ -176,12 +187,14 @@ bot.callbackQuery(/^format:(YOUTUBE|VERTICAL)$/, async (ctx) => {
   ctx.session.draft = { ...ctx.session.draft, format: ctx.match[1] as CoverFormat };
   ctx.session.step = "topic";
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply(topicPrompt());
 });
 
 bot.callbackQuery(/^niche:(.+)$/, async (ctx) => {
   ctx.session.draft = { ...ctx.session.draft, niche: ctx.match[1] };
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply("Выберите стиль:", { reply_markup: styleKeyboard() });
 });
 
@@ -189,6 +202,7 @@ bot.callbackQuery(/^style:(.+)$/, async (ctx) => {
   ctx.session.draft = { ...ctx.session.draft, style: ctx.match[1] };
   ctx.session.step = "hook";
   await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
   await ctx.reply(hookPrompt());
 });
 
@@ -271,10 +285,12 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
     await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from.id }, { jobId: generation.id });
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
     await ctx.reply("Задача отправлена в генерацию. Обычно это занимает до минуты.");
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось создать генерацию.";
     await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
     await ctx.reply(message === "Insufficient credits." ? "Недостаточно кредитов. Пополните баланс." : message);
   }
 });
