@@ -1,0 +1,23 @@
+{
+  "name": "@covers/worker",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/worker.js",
+  "types": "dist/worker.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/worker.ts",
+    "start": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@covers/db": "0.1.0",
+    "@covers/domain": "0.1.0",
+    "@covers/generation-ai": "0.1.0",
+    "@covers/media-source": "0.1.0",
+    "@covers/storage": "0.1.0",
+    "bullmq": "^5.34.5",
+    "grammy": "^1.33.0",
+    "ioredis": "^5.4.2",
+    "sharp": "^0.33.5"
+  }
+}

@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum LedgerReason {
+  PURCHASE
+  GENERATION_DEBIT
+  GENERATION_REFUND
+  MANUAL_ADJUSTMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  REFUNDED
+  FAILED
+}
+
+enum GenerationFormat {
+  YOUTUBE
+  VERTICAL
+}
+
+enum ReferenceMode {
+  FACE
+  REFERENCE
+  NONE
+}
+
+enum GenerationStatus {
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
+enum SourceType {
+  LINK
+  VIDEO
+  TRANSCRIPT
+}
+
+enum ProjectPlatform {
+  YOUTUBE
+  INSTAGRAM_TIKTOK
+  FACELESS
+}
+
+enum ProjectStatus {
+  DRAFT
+  SOURCE_PROCESSING
+  SOURCE_READY
+  SOURCE_FAILED
+  HOOKS_PENDING
+  HOOKS_READY
+  GENERATION_PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id             String              @id @default(cuid())
+  telegramId     BigInt              @unique
+  username       String?
+  firstName      String?
+  languageCode   String?
+  status         UserStatus          @default(ACTIVE)
+  balance        Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  ledgerEntries  CreditLedgerEntry[]
+  payments       Payment[]
+  projects       Project[]
+  generations    Generation[]
+
+  @@index([status, createdAt])
+}
+
+model CreditLedgerEntry {
+  id           String       @id @default(cuid())
+  userId       String
+  amount       Int
+  reason       LedgerReason
+  referenceId  String?
+  note         String?
+  createdAt    DateTime     @default(now())
+  user         User         @relation(fields: [userId], references: [id])
+}
+
+model CreditPackage {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  starsPrice  Int
+  credits     Int
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  payments    Payment[]
+}
+
+model Payment {
+  id                       String        @id @default(cuid())
+  userId                   String
+  packageId                String?
+  status                   PaymentStatus @default(PENDING)
+  starsAmount              Int
+  creditsGranted           Int
+  payload                  String        @unique
+  telegramPaymentChargeId  String?       @unique
+  providerPaymentChargeId  String?
+  raw                      Json?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  user                     User          @relation(fields: [userId], references: [id])
+  package                  CreditPackage? @relation(fields: [packageId], references: [id])
+}
+
+model PromptPreset {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  title          String
+  niche          String
+  style          String
+  promptTemplate String
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Project {
+  id              String           @id @default(cuid())
+  userId          String
+  status          ProjectStatus    @default(DRAFT)
+  sourceType      SourceType
+  platform        ProjectPlatform?
+  topicSummary    String?
+  selectedHookId  String?
+  selectedTemplateId String?
+  errorMessage    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  user            User             @relation(fields: [userId], references: [id])
+  sourceAssets    SourceAsset[]
+  transcripts     Transcript[]
+  hooks           HookCandidate[]
+  generations     Generation[]
+  selectedHook    HookCandidate?   @relation("SelectedHook", fields: [selectedHookId], references: [id])
+  selectedTemplate Template?        @relation(fields: [selectedTemplateId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([platform, createdAt])
+}
+
+model SourceAsset {
+  id           String     @id @default(cuid())
+  projectId    String
+  type         SourceType
+  url          String?
+  text         String?
+  fileId       String?
+  mimeType     String?
+  previewImageUrl String?
+  metadata     Json?
+  createdAt    DateTime   @default(now())
+  project      Project    @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([type, createdAt])
+}
+
+model Transcript {
+  id          String    @id @default(cuid())
+  projectId   String
+  rawText     String
+  cleanText   String?
+  language    String?
+  providerMeta Json?
+  createdAt   DateTime  @default(now())
+  project     Project   @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
+model HookCandidate {
+  id        String    @id @default(cuid())
+  projectId String
+  text      String
+  angle     String?
+  score     Int       @default(0)
+  isSelected Boolean  @default(false)
+  createdAt DateTime  @default(now())
+  project   Project   @relation(fields: [projectId], references: [id])
+  selectedByProjects Project[] @relation("SelectedHook")
+  generations Generation[]
+
+  @@index([projectId, score])
+  @@index([projectId, isSelected])
+}
+
+model Template {
+  id            String           @id @default(cuid())
+  slug          String           @unique
+  title         String
+  platform      ProjectPlatform
+  previewImageUrl String?
+  promptRules   String
+  isActive      Boolean          @default(true)
+  sortOrder     Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  projects      Project[]
+  generations   Generation[]
+
+  @@index([platform, isActive, sortOrder])
+}
+
+model Generation {
+  id            String           @id @default(cuid())
+  userId        String
+  projectId     String?
+  templateId    String?
+  hookCandidateId String?
+  format        GenerationFormat
+  platform      ProjectPlatform?
+  status        GenerationStatus @default(QUEUED)
+  referenceMode ReferenceMode
+  referenceImageUrl String?
+  referenceAnalysis String?
+  topic         String
+  hookText      String?
+  niche         String
+  style         String
+  prompt        String
+  creditCost    Int              @default(1)
+  originalUrl   String?
+  previewUrl    String?
+  providerTaskId String?
+  providerMeta  Json?
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  user          User             @relation(fields: [userId], references: [id])
+  project       Project?         @relation(fields: [projectId], references: [id])
+  template      Template?        @relation(fields: [templateId], references: [id])
+  hookCandidate HookCandidate?   @relation(fields: [hookCandidateId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([providerTaskId])
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  target    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}

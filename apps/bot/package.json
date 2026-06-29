@@ -1,0 +1,20 @@
+{
+  "name": "@covers/bot",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/bot.js",
+  "types": "dist/bot.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/bot.ts",
+    "start": "node dist/bot.js"
+  },
+  "dependencies": {
+    "@covers/db": "0.1.0",
+    "@covers/domain": "0.1.0",
+    "@covers/telegram-payments": "0.1.0",
+    "bullmq": "^5.34.5",
+    "grammy": "^1.33.0",
+    "ioredis": "^5.4.2"
+  }
+}

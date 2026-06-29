@@ -1,0 +1,14 @@
+{
+  "name": "@covers/db",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@covers/domain": "0.1.0",
+    "@prisma/client": "^6.1.0"
+  }
+}

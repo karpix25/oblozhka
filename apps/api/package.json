@@ -1,0 +1,17 @@
+{
+  "name": "@covers/api",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@covers/db": "0.1.0",
+    "@fastify/cors": "^10.0.2",
+    "fastify": "^5.1.0"
+  }
+}
