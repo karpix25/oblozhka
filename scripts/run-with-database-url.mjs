@@ -9,7 +9,7 @@ if (!command) {
   process.exit(1);
 }
 
-if (isEnabled(process.env.DATABASE_URL_FROM_POSTGRES_PARTS) || !process.env.DATABASE_URL?.trim()) {
+if (!process.env.DATABASE_URL?.trim()) {
   process.env.DATABASE_URL = buildDatabaseUrl(process.env);
 }
 

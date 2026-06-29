@@ -46,7 +46,7 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
-      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
+      DATABASE_URL: ${DATABASE_URL:-}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-covers}
@@ -82,7 +82,7 @@ services:
       - path: .env.docker
         required: false
     environment:
-      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
+      DATABASE_URL: ${DATABASE_URL:-}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-covers}
@@ -105,7 +105,7 @@ services:
       - path: .env.docker
         required: false
     environment:
-      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
+      DATABASE_URL: ${DATABASE_URL:-}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-covers}

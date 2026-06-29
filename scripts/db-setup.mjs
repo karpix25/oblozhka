@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { buildDatabaseUrl, isEnabled, maskDatabaseUrl } from "./shared-database-url.mjs";
 
-const databaseUrl = isEnabled(process.env.DATABASE_URL_FROM_POSTGRES_PARTS) || !process.env.DATABASE_URL?.trim()
+const databaseUrl = !process.env.DATABASE_URL?.trim()
   ? buildDatabaseUrl(process.env)
   : process.env.DATABASE_URL;
 process.env.DATABASE_URL = databaseUrl;

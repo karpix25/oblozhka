@@ -95,6 +95,10 @@ early test database without an interactive prompt. For a production release
 with versioned migrations, disable that flag and replace the startup sync with
 `prisma migrate deploy` after creating the first migration.
 
+If a Postgres volume already exists, changing `POSTGRES_PASSWORD` does not
+change the stored database password. In that case set `DATABASE_URL` to the
+actual existing database credentials, or recreate the Postgres volume.
+
 Useful commands:
 
 ```bash
