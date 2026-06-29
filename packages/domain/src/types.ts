@@ -42,6 +42,7 @@ export type WizardInput = {
   format: CoverFormat;
   referenceMode: ReferenceMode;
   referenceImageUrl?: string;
+  guestReferenceImageUrl?: string;
   platform?: ProjectPlatform;
   templateSlug?: string;
   topic: string;

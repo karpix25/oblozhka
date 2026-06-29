@@ -9,6 +9,7 @@ export type PromptPlan = {
 export type ImageGenerationInput = {
   prompt: string;
   imageUrl?: string;
+  imageUrls?: string[];
   aspectRatio: string;
 };
 

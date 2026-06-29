@@ -1,6 +1,7 @@
 export * from "./admin.js";
 export * from "./client.js";
 export * from "./credits.js";
+export * from "./faceAssets.js";
 export * from "./generations.js";
 export * from "./hooks.js";
 export * from "./packages.js";

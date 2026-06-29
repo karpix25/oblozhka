@@ -1,7 +1,7 @@
 import type { WizardInput } from "@covers/domain";
 import type { Context, SessionFlavor } from "grammy";
 
-export type WizardStep = "idle" | "sourceLink" | "sourceTranscript" | "sourceVideo" | "referenceUpload" | "topic" | "hook";
+export type WizardStep = "idle" | "sourceLink" | "sourceTranscript" | "sourceVideo" | "guestFaceUpload" | "referenceUpload" | "topic" | "hook";
 
 export type BotSession = {
   step: WizardStep;

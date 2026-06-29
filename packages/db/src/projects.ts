@@ -55,6 +55,14 @@ export async function setProjectTemplate(db: DbClient, projectId: string, templa
   });
 }
 
+export async function setProjectGuestFaceAsset(db: DbClient, projectId: string, guestFaceAssetId: string) {
+  return db.project.update({
+    where: { id: projectId },
+    data: { guestFaceAssetId },
+    include: { guestFaceAsset: true, selectedTemplate: true }
+  });
+}
+
 export async function selectProjectHook(db: DbClient, projectId: string, hookId: string) {
   return db.$transaction(async (tx) => {
     await tx.hookCandidate.updateMany({
@@ -99,7 +107,8 @@ export async function findProject(db: DbClient, projectId: string) {
       transcripts: true,
       hooks: { orderBy: [{ score: "desc" }, { createdAt: "asc" }] },
       selectedHook: true,
-      selectedTemplate: true
+      selectedTemplate: true,
+      guestFaceAsset: true
     }
   });
 }

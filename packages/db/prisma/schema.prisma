@@ -82,8 +82,26 @@ model User {
   payments       Payment[]
   projects       Project[]
   generations    Generation[]
+  faceAssets     UserFaceAsset[]
 
   @@index([status, createdAt])
+}
+
+model UserFaceAsset {
+  id             String    @id @default(cuid())
+  userId         String
+  title          String?
+  telegramFileId String?
+  imageUrl       String
+  isDefault      Boolean   @default(false)
+  metadata       Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id])
+  guestProjects  Project[] @relation("ProjectGuestFaceAsset")
+  guestGenerations Generation[] @relation("GenerationGuestFaceAsset")
+
+  @@index([userId, createdAt])
 }
 
 model CreditLedgerEntry {
@@ -147,6 +165,7 @@ model Project {
   topicSummary    String?
   selectedHookId  String?
   selectedTemplateId String?
+  guestFaceAssetId String?
   errorMessage    String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -157,10 +176,12 @@ model Project {
   generations     Generation[]
   selectedHook    HookCandidate?   @relation("SelectedHook", fields: [selectedHookId], references: [id])
   selectedTemplate Template?        @relation(fields: [selectedTemplateId], references: [id])
+  guestFaceAsset UserFaceAsset?     @relation("ProjectGuestFaceAsset", fields: [guestFaceAssetId], references: [id])
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([platform, createdAt])
+  @@index([guestFaceAssetId])
 }
 
 model SourceAsset {
@@ -237,6 +258,8 @@ model Generation {
   status        GenerationStatus @default(QUEUED)
   referenceMode ReferenceMode
   referenceImageUrl String?
+  guestFaceAssetId String?
+  guestReferenceImageUrl String?
   referenceAnalysis String?
   topic         String
   hookText      String?
@@ -255,10 +278,12 @@ model Generation {
   project       Project?         @relation(fields: [projectId], references: [id])
   template      Template?        @relation(fields: [templateId], references: [id])
   hookCandidate HookCandidate?   @relation(fields: [hookCandidateId], references: [id])
+  guestFaceAsset UserFaceAsset?   @relation("GenerationGuestFaceAsset", fields: [guestFaceAssetId], references: [id])
 
   @@index([projectId, createdAt])
   @@index([status, createdAt])
   @@index([userId, createdAt])
+  @@index([guestFaceAssetId])
   @@index([providerTaskId])
 }
 

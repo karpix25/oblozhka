@@ -47,6 +47,7 @@ export async function createGenerationFromProject(
       include: {
         selectedHook: true,
         selectedTemplate: true,
+        guestFaceAsset: true,
         transcripts: true,
         sourceAssets: true
       }
@@ -69,6 +70,8 @@ export async function createGenerationFromProject(
         format,
         referenceMode: project.platform === "FACELESS" ? "REFERENCE" : "FACE",
         referenceImageUrl: input.referenceImageUrl,
+        guestFaceAssetId: project.guestFaceAssetId,
+        guestReferenceImageUrl: project.guestFaceAsset?.imageUrl,
         topic,
         hookText: project.selectedHook.text,
         niche: project.platform,
@@ -150,7 +153,7 @@ export async function markGenerationFailed(db: DbClient, id: string, errorMessag
 }
 
 export async function findGeneration(db: DbClient, id: string) {
-  return db.generation.findUnique({ where: { id }, include: { user: true } });
+  return db.generation.findUnique({ where: { id }, include: { user: true, guestFaceAsset: true } });
 }
 
 export async function listGenerations(db: DbClient) {

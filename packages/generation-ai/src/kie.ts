@@ -24,7 +24,8 @@ export class KieImageClient {
       throw new Error("KIE_API_KEY is required.");
     }
 
-    if (!input.imageUrl) {
+    const inputUrls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+    if (inputUrls.length === 0) {
       throw new Error("Kie.ai image-to-image generation requires a reference image URL.");
     }
 
@@ -33,7 +34,7 @@ export class KieImageClient {
       callBackUrl: this.callbackUrl || undefined,
       input: {
         prompt: input.prompt,
-        input_urls: [input.imageUrl],
+        input_urls: inputUrls,
         aspect_ratio: input.aspectRatio
       }
     });

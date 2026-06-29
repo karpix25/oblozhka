@@ -49,6 +49,7 @@ new Worker<GenerationJobData, void, string>(
           format: generation.format,
           referenceMode: generation.referenceMode,
           referenceImageUrl: generation.referenceImageUrl ?? undefined,
+          guestReferenceImageUrl: generation.guestReferenceImageUrl ?? undefined,
           topic: generation.topic,
           niche: generation.niche,
           hookText: generation.hookText ?? undefined,
@@ -66,6 +67,7 @@ new Worker<GenerationJobData, void, string>(
       const result = await imageClient.generate({
         prompt: plan.prompt,
         imageUrl: generation.referenceImageUrl ?? undefined,
+        imageUrls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
         aspectRatio: spec.aspectRatio
       });
       const finalImage = await normalizeFinal(result.bytes, spec.width, spec.height);

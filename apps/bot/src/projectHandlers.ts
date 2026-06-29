@@ -12,6 +12,7 @@ import {
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
 import { mainKeyboard, platformKeyboard, sourceTypeKeyboard } from "./keyboards.js";
+import { askGuestFace, requiresGuestFace, saveUploadedGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
 import {
   platformPrompt,
   referenceForGenerationPrompt,
@@ -101,13 +102,36 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
       await ctx.answerCallbackQuery("Сначала создайте проект.");
       return;
     }
-    await setProjectTemplate(prisma, ctx.session.projectId, ctx.match[1]);
+    const project = await setProjectTemplate(prisma, ctx.session.projectId, ctx.match[1]);
     ctx.session.templateGalleryMode = undefined;
-    await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId, userTelegramId: ctx.from.id }, { jobId: `${ctx.session.projectId}:hooks` });
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
+    if (requiresGuestFace(project.selectedTemplate)) {
+      await askGuestFace(ctx);
+      return;
+    }
+    await enqueueHooks(ctx);
   });
+
+  bot.callbackQuery(/^guestface:use:(.+)$/, async (ctx) => {
+    if (await useSavedGuestFace(ctx, ctx.match[1], token)) {
+      await deleteCallbackMessage(ctx);
+      await enqueueHooks(ctx);
+    }
+  });
+
+  bot.callbackQuery("guestface:upload", async (ctx) => {
+    ctx.session.step = "guestFaceUpload";
+    await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+    await ctx.reply("Загрузите фото второго человека для podcast countdown.");
+  });
+
+  async function enqueueHooks(ctx: BotContext) {
+    if (!ctx.session.projectId) return;
+    await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId, userTelegramId: ctx.from!.id }, { jobId: `${ctx.session.projectId}:hooks` });
+    await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
+  }
 
   bot.callbackQuery(/^hook:([^:]+):(.+)$/, async (ctx) => {
     const projectId = ctx.match[1];
@@ -162,6 +186,12 @@ export async function handleProjectText(ctx: BotContext) {
 }
 
 export async function handleProjectPhoto(ctx: BotContext, token: string) {
+  if (await saveUploadedGuestFace(ctx, token)) {
+    await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id }, { jobId: `${ctx.session.projectId}:hooks` });
+    await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
+    return true;
+  }
+
   if (!ctx.session.projectId || ctx.session.step !== "referenceUpload") {
     return false;
   }

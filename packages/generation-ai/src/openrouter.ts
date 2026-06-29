@@ -125,6 +125,9 @@ export class OpenRouterPromptPlanner {
           `Ниша: ${input.wizard.niche}.`,
           `Стиль: ${input.wizard.style}.`,
           `Текст на обложке: ${input.wizard.hookText || "без текста"}.`,
+          input.wizard.guestReferenceImageUrl
+            ? "Есть второй человек/гость. Используй его как отдельное лицо второго участника, особенно для podcast/podcast countdown композиций."
+            : "Второго лица/гостя нет.",
           "Не копируй чужой дизайн один-в-один. Бери только композицию, настроение, контраст и читаемость.",
           "Промпт должен требовать крупный фокусный объект, чистую композицию, русский текст без ошибок, коммерческий thumbnail-look."
         ].join("\n")
@@ -133,6 +136,9 @@ export class OpenRouterPromptPlanner {
 
     if (input.wizard.referenceImageUrl) {
       userContent.push({ type: "image_url", image_url: { url: input.wizard.referenceImageUrl } });
+    }
+    if (input.wizard.guestReferenceImageUrl) {
+      userContent.push({ type: "image_url", image_url: { url: input.wizard.guestReferenceImageUrl } });
     }
 
     return [
@@ -167,6 +173,7 @@ export class OpenRouterPromptPlanner {
         `Create a high-converting ${input.formatDescription} thumbnail, aspect ratio ${input.aspectRatio}.`,
         `Topic: ${input.wizard.topic}. Niche: ${input.wizard.niche}. Style: ${input.wizard.style}.`,
         faceRule,
+        input.wizard.guestReferenceImageUrl ? "Use the second uploaded face as a separate guest/person in the composition." : "",
         input.wizard.hookText ? `Large readable Russian cover text: "${input.wizard.hookText}".` : "No unnecessary text.",
         "Bold focal subject, clean background, strong contrast, readable at small size, no watermarks."
       ].join("\n")
