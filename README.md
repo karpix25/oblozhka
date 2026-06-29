@@ -48,6 +48,63 @@ npm run dev:bot
 npm run dev:admin
 ```
 
+## Docker Setup
+
+Use this path when you do not have local Postgres or Redis installed.
+
+1. Create a Docker env file:
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+2. Fill the required keys in `.env.docker`:
+
+```bash
+BOT_TOKEN=""
+KIE_API_KEY=""
+OPENROUTER_API_KEY=""
+SCRAPECREATORS_API_KEY=""
+DEEPGRAM_API_KEY=""
+S3_ENDPOINT=""
+S3_BUCKET=""
+S3_ACCESS_KEY_ID=""
+S3_SECRET_ACCESS_KEY=""
+S3_PUBLIC_BASE_URL=""
+```
+
+3. Start the full stack:
+
+```bash
+docker compose up --build
+```
+
+The stack includes:
+
+- `postgres` on `localhost:5432`
+- `redis` on `localhost:6379`
+- `api` on `http://localhost:3000`
+- `admin` on `http://localhost:5173`
+- `worker`
+- `bot`
+
+`db-setup` runs once before the app starts and applies the Prisma schema to
+Postgres with `prisma db push`. For a production release with versioned
+migrations, replace this command with `prisma migrate deploy` after creating
+the first migration.
+
+Useful commands:
+
+```bash
+docker compose ps
+docker compose logs -f api worker bot
+docker compose down
+docker compose down -v
+```
+
+Use `docker compose down -v` only when you want to delete local Postgres and
+Redis data.
+
 The MVP uses Telegram Stars for digital goods. Credits are granted only after
 `successful_payment`, never after `pre_checkout_query`.
 
