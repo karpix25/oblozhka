@@ -1,6 +1,6 @@
 import { generationDebit, type ProjectPlatform, type WizardInput } from "@covers/domain";
 import type { DbClient } from "./client.js";
-import { mutateCredits, mutateCreditsInTransaction } from "./credits.js";
+import { mutateCreditsInTransaction } from "./credits.js";
 
 export async function createGeneration(
   db: DbClient,
@@ -134,22 +134,32 @@ export async function markGenerationSucceeded(
 }
 
 export async function markGenerationFailed(db: DbClient, id: string, errorMessage: string) {
-  const generation = await db.generation.update({
-    where: { id },
-    data: { status: "FAILED", errorMessage }
-  });
-
-  if (generation.creditCost > 0) {
-    await mutateCredits(db, {
-      userId: generation.userId,
-      amount: generation.creditCost,
-      reason: "GENERATION_REFUND",
-      referenceId: generation.id,
-      note: "Generation failed"
+  return db.$transaction(async (tx) => {
+    const generation = await tx.generation.update({
+      where: { id },
+      data: { status: "FAILED", errorMessage }
     });
-  }
 
-  return generation;
+    const existingRefund = await tx.creditLedgerEntry.findFirst({
+      where: {
+        userId: generation.userId,
+        reason: "GENERATION_REFUND",
+        referenceId: generation.id
+      }
+    });
+
+    if (generation.creditCost > 0 && !existingRefund) {
+      await mutateCreditsInTransaction(tx, {
+        userId: generation.userId,
+        amount: generation.creditCost,
+        reason: "GENERATION_REFUND",
+        referenceId: generation.id,
+        note: "Generation failed"
+      });
+    }
+
+    return generation;
+  });
 }
 
 export async function findGeneration(db: DbClient, id: string) {

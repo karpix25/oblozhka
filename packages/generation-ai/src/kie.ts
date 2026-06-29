@@ -35,7 +35,8 @@ export class KieImageClient {
       input: {
         prompt: input.prompt,
         input_urls: inputUrls,
-        aspect_ratio: input.aspectRatio
+        aspect_ratio: input.aspectRatio,
+        resolution: input.resolution ?? "1K"
       }
     });
 

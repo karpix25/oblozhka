@@ -11,6 +11,7 @@ export type ImageGenerationInput = {
   imageUrl?: string;
   imageUrls?: string[];
   aspectRatio: string;
+  resolution?: string;
 };
 
 export type ImageGenerationResult = {

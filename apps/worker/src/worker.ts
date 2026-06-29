@@ -17,6 +17,7 @@ import { ObjectStorage } from "@covers/storage";
 import { Worker } from "bullmq";
 import { createPreview, normalizeFinal } from "./imageProcessing.js";
 import { TelegramNotifier } from "./notifier.js";
+import { prepareReferenceImageUrls } from "./referenceImages.js";
 
 const redisUrl = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
 const connection = {
@@ -64,10 +65,16 @@ new Worker<GenerationJobData, void, string>(
         providerMeta: { promptPlannerModel: plan.model }
       });
 
+      const referenceUrls = await prepareReferenceImageUrls({
+        generationId: generation.id,
+        urls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
+        storage
+      });
+
       const result = await imageClient.generate({
         prompt: plan.prompt,
-        imageUrl: generation.referenceImageUrl ?? undefined,
-        imageUrls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
+        imageUrl: referenceUrls[0],
+        imageUrls: referenceUrls,
         aspectRatio: spec.aspectRatio
       });
       const finalImage = await normalizeFinal(result.bytes, spec.width, spec.height);
@@ -91,8 +98,16 @@ new Worker<GenerationJobData, void, string>(
       });
       await notifier.sendGenerationResult(job.data.userTelegramId, previewUrl, originalUrl);
     } catch (error) {
-      await markGenerationFailed(prisma, generation.id, error instanceof Error ? error.message : "Unknown error");
-      await notifier.sendGenerationFailure(job.data.userTelegramId);
+      console.error("Generation job failed", {
+        generationId: generation.id,
+        attemptsMade: job.attemptsMade,
+        attempts: job.opts.attempts,
+        error
+      });
+      if (isFinalAttempt(job)) {
+        await markGenerationFailed(prisma, generation.id, error instanceof Error ? error.message : "Unknown error");
+        await notifier.sendGenerationFailure(job.data.userTelegramId);
+      }
       throw error;
     }
   },
@@ -157,4 +172,8 @@ async function ensureProjectTranscript(project: NonNullable<Awaited<ReturnType<t
 
   await markProjectStatus(prisma, project.id, "SOURCE_READY");
   return result.text;
+}
+
+function isFinalAttempt(job: { attemptsMade: number; opts: { attempts?: number } }) {
+  return job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
 }
