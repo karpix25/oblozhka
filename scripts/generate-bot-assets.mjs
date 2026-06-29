@@ -5,22 +5,40 @@ import sharp from "sharp";
 const templateDir = new URL("../apps/bot/assets/templates/", import.meta.url);
 const onboardingSource = new URL("../brand/assets/hookcover-bot-cover-1280.png", import.meta.url);
 const onboardingTarget = new URL("../apps/bot/assets/onboarding.png", import.meta.url);
+const youtubeReferenceDir = new URL("../brand/reference-styles/youtube/", import.meta.url);
 
-const cards = [
+const youtubeReferences = [
+  ["01-podcast.png", "podcast"],
+  ["02-center-stage.png", "center-stage"],
+  ["03-podcast-countdown.png", "podcast-countdown"],
+  ["04-simple-text.png", "simple-text"],
+  ["05-whiteboard.png", "whiteboard"],
+  ["06-text-on-image.png", "text-on-image"],
+  ["07-history.png", "history"],
+  ["08-explainer.png", "explainer"],
+  ["09-object-in-hand.png", "object-in-hand"],
+  ["10-contextual-background.png", "contextual-background"],
+  ["11-before-after.png", "before-after"]
+];
+
+const fallbackCards = [
   ["faceless-pov", "Faceless POV", "FACELESS", "#101216", "#F9D84A", "POV", "START EARNING"],
-  ["split-text", "Split Text", "YOUTUBE", "#0B1B2B", "#FF3B30", "2175", "COMING"],
-  ["double-focus-arrow", "Double Focus Arrow", "YOUTUBE", "#0F5132", "#F9D84A", "A -> B", "WHY NOW"],
-  ["foreground-focus", "Foreground Focus", "INSTAGRAM/TIKTOK", "#1F2937", "#25D7F7", "CLOSE-UP", "WOW"],
+  ["foreground-focus", "Foreground Focus", "REELS/TIKTOK", "#1F2937", "#25D7F7", "CLOSE-UP", "WOW"],
   ["center-object-text", "Center Object Text", "FACELESS", "#F8FAFC", "#101216", "OBJECT", "I OWN"],
-  ["skewed-hero-text", "Skewed Hero Text", "YOUTUBE", "#203040", "#FF3B30", "HIJACKED", "STORY"],
-  ["subject-circle-highlight", "Subject Circle Highlight", "YOUTUBE", "#16351F", "#F9D84A", "HIDDEN", "LOOK HERE"],
-  ["split-compare", "Split Compare", "INSTAGRAM/TIKTOK", "#E9EEF2", "#101216", "BEFORE / AFTER", "RESULT"]
+  ["split-compare", "Split Compare", "REELS/TIKTOK", "#E9EEF2", "#101216", "BEFORE / AFTER", "RESULT"]
 ];
 
 await fs.mkdir(templateDir, { recursive: true });
 await fs.copyFile(onboardingSource, onboardingTarget);
 
-for (const [slug, title, platform, bg, accent, big, small] of cards) {
+for (const [sourceName, slug] of youtubeReferences) {
+  await sharp(fileURLToPath(new URL(sourceName, youtubeReferenceDir)))
+    .resize(1280, 720, { fit: "cover" })
+    .png()
+    .toFile(fileURLToPath(new URL(`${slug}.png`, templateDir)));
+}
+
+for (const [slug, title, platform, bg, accent, big, small] of fallbackCards) {
   const svg = templateSvg({ title, platform, bg, accent, big, small });
   await sharp(Buffer.from(svg)).png().toFile(fileURLToPath(new URL(`${slug}.png`, templateDir)));
 }

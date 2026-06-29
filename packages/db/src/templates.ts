@@ -1,7 +1,14 @@
 import { DEFAULT_TEMPLATES, type ProjectPlatform, type TemplateDefinition } from "@covers/domain";
 import type { DbClient } from "./client.js";
 
+const legacyDefaultSlugs = ["split-text", "double-focus-arrow", "skewed-hero-text", "subject-circle-highlight"];
+
 export async function seedDefaultTemplates(db: DbClient, templates: TemplateDefinition[] = DEFAULT_TEMPLATES) {
+  await db.template.updateMany({
+    where: { slug: { in: legacyDefaultSlugs } },
+    data: { isActive: false }
+  });
+
   for (const template of templates) {
     await db.template.upsert({
       where: { slug: template.slug },
