@@ -15,6 +15,10 @@ if (isEnabled(process.env.DATABASE_URL_FROM_POSTGRES_PARTS) || !process.env.DATA
 
 console.log(`database: ${maskDatabaseUrl(process.env.DATABASE_URL)}`);
 
+if (isEnabled(process.env.RUN_DB_SETUP_BEFORE_START)) {
+  await runDatabaseSetup();
+}
+
 const child = spawn(command, args, {
   stdio: "inherit",
   env: process.env
@@ -27,3 +31,28 @@ child.on("exit", (code, signal) => {
   }
   process.exit(code ?? 1);
 });
+
+async function runDatabaseSetup() {
+  console.log("database: running Prisma schema sync before service start");
+
+  const args = ["scripts/db-setup.mjs"];
+  const child = spawn("node", args, {
+    stdio: "inherit",
+    env: process.env
+  });
+
+  const code = await new Promise((resolve) => {
+    child.on("exit", (code, signal) => {
+      if (signal) {
+        console.error(`database: setup exited by signal ${signal}`);
+        resolve(1);
+        return;
+      }
+      resolve(code ?? 1);
+    });
+  });
+
+  if (code !== 0) {
+    throw new Error(`database: setup failed with exit code ${code}`);
+  }
+}

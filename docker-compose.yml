@@ -32,31 +32,12 @@ services:
       timeout: 3s
       retries: 20
 
-  db-setup:
+  api:
     build:
       context: .
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
         VITE_ADMIN_TOKEN: ${VITE_ADMIN_TOKEN:-}
-    image: hookcover-app:local
-    restart: "no"
-    env_file:
-      - path: .env.docker
-        required: false
-    environment:
-      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-covers}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      PRISMA_DB_PUSH_ACCEPT_DATA_LOSS: ${PRISMA_DB_PUSH_ACCEPT_DATA_LOSS:-true}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: ["node", "scripts/db-setup.mjs"]
-
-  api:
     image: hookcover-app:local
     restart: unless-stopped
     env_file:
@@ -71,6 +52,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-covers}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PRISMA_DB_PUSH_ACCEPT_DATA_LOSS: ${PRISMA_DB_PUSH_ACCEPT_DATA_LOSS:-true}
+      RUN_DB_SETUP_BEFORE_START: "true"
       REDIS_URL: redis://redis:6379
     ports:
       - "${API_PORT:-3000}:3000"
@@ -79,8 +62,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      db-setup:
-        condition: service_completed_successfully
     command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/api", "run", "start"]
     healthcheck:
       test:
@@ -113,8 +94,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      db-setup:
-        condition: service_completed_successfully
+      api:
+        condition: service_healthy
     command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/worker", "run", "start"]
 
   bot:
@@ -136,8 +117,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      db-setup:
-        condition: service_completed_successfully
+      api:
+        condition: service_healthy
     command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/bot", "run", "start"]
 
   admin:
