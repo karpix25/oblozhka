@@ -44,11 +44,17 @@ services:
       - path: .env.docker
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-covers}
+      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-covers}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PRISMA_DB_PUSH_ACCEPT_DATA_LOSS: ${PRISMA_DB_PUSH_ACCEPT_DATA_LOSS:-true}
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["npm", "run", "prisma:push"]
+    command: ["node", "scripts/db-setup.mjs"]
 
   api:
     image: hookcover-app:local
@@ -59,7 +65,12 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-covers}
+      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-covers}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       REDIS_URL: redis://redis:6379
     ports:
       - "${API_PORT:-3000}:3000"
@@ -70,6 +81,7 @@ services:
         condition: service_healthy
       db-setup:
         condition: service_completed_successfully
+    command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/api", "run", "start"]
     healthcheck:
       test:
         [
@@ -89,7 +101,12 @@ services:
       - path: .env.docker
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-covers}
+      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-covers}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
@@ -98,7 +115,7 @@ services:
         condition: service_healthy
       db-setup:
         condition: service_completed_successfully
-    command: ["npm", "--workspace", "@covers/worker", "run", "start"]
+    command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/worker", "run", "start"]
 
   bot:
     image: hookcover-app:local
@@ -107,7 +124,12 @@ services:
       - path: .env.docker
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-covers}
+      DATABASE_URL_FROM_POSTGRES_PARTS: "true"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-covers}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
@@ -116,7 +138,7 @@ services:
         condition: service_healthy
       db-setup:
         condition: service_completed_successfully
-    command: ["npm", "--workspace", "@covers/bot", "run", "start"]
+    command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/bot", "run", "start"]
 
   admin:
     image: hookcover-app:local

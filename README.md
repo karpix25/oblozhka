@@ -89,9 +89,11 @@ The stack includes:
 - `bot`
 
 `db-setup` runs once before the app starts and applies the Prisma schema to
-Postgres with `prisma db push`. For a production release with versioned
-migrations, replace this command with `prisma migrate deploy` after creating
-the first migration.
+Postgres with `prisma db push`. In the Docker MVP path,
+`PRISMA_DB_PUSH_ACCEPT_DATA_LOSS=true` is enabled so Coolify can update an
+early test database without an interactive prompt. For a production release
+with versioned migrations, disable that flag and replace this command with
+`prisma migrate deploy` after creating the first migration.
 
 Useful commands:
 

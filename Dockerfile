@@ -11,6 +11,7 @@ FROM base AS deps
 
 ENV NODE_ENV=development
 COPY package.json package-lock.json tsconfig.base.json ./
+COPY scripts ./scripts
 COPY apps ./apps
 COPY packages ./packages
 RUN npm ci
@@ -29,6 +30,7 @@ RUN npm prune --omit=dev
 FROM base AS runtime
 
 COPY --from=build /app/package.json /app/package-lock.json /app/tsconfig.base.json ./
+COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps ./apps
 COPY --from=build /app/packages ./packages
