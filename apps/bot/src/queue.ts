@@ -30,3 +30,15 @@ export const hookQueue = new Queue<HookJobData, void, string>(HOOK_QUEUE, {
     removeOnFail: 100
   }
 });
+
+export function hookJobId(projectId: string) {
+  return `hooks-${safeJobIdPart(projectId)}`;
+}
+
+export function generationJobId(generationId: string) {
+  return `generation-${safeJobIdPart(generationId)}`;
+}
+
+function safeJobIdPart(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
+}

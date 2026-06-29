@@ -20,7 +20,7 @@ import {
   sourceStartMessage,
 } from "./messages.js";
 import { deleteCallbackMessage } from "./navigation.js";
-import { generationQueue, hookQueue } from "./queue.js";
+import { generationJobId, generationQueue, hookJobId, hookQueue } from "./queue.js";
 import { type BotContext, resetWizard } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
@@ -129,7 +129,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
 
   async function enqueueHooks(ctx: BotContext) {
     if (!ctx.session.projectId) return;
-    await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId, userTelegramId: ctx.from!.id }, { jobId: `${ctx.session.projectId}:hooks` });
+    await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId) });
     await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
   }
 
@@ -187,7 +187,7 @@ export async function handleProjectText(ctx: BotContext) {
 
 export async function handleProjectPhoto(ctx: BotContext, token: string) {
   if (await saveUploadedGuestFace(ctx, token)) {
-    await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id }, { jobId: `${ctx.session.projectId}:hooks` });
+    await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId!) });
     await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
     return true;
   }
@@ -215,7 +215,7 @@ export async function handleProjectPhoto(ctx: BotContext, token: string) {
     referenceImageUrl: telegramFileUrl(token, file.file_path),
     chargeCredits
   });
-  await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from!.id }, { jobId: generation.id });
+  await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from!.id }, { jobId: generationJobId(generation.id) });
   resetWizard(ctx);
   await ctx.reply("Принял визуальную основу. Генерирую обложку по выбранному хуку и шаблону.");
   return true;

@@ -38,7 +38,7 @@ import {
 import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
-import { generationQueue } from "./queue.js";
+import { generationJobId, generationQueue } from "./queue.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
 import { profileFromContext } from "./userProfile.js";
 
@@ -282,7 +282,7 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
       prompt: "Prompt will be planned by OpenRouter in the worker.",
       chargeCredits
     });
-    await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from.id }, { jobId: generation.id });
+    await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from.id }, { jobId: generationJobId(generation.id) });
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
