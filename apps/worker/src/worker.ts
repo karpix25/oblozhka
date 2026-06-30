@@ -96,7 +96,12 @@ new Worker<GenerationJobData, void, string>(
         previewUrl,
         providerMeta: { imageModel: result.model, promptPlannerModel: plan.model, raw: result.raw }
       });
-      await notifier.sendGenerationResult(job.data.userTelegramId, previewUrl, originalUrl);
+      await notifier.sendGenerationResult(job.data.userTelegramId, {
+        previewUrl,
+        originalUrl,
+        previewBytes: preview,
+        originalBytes: finalImage
+      });
     } catch (error) {
       console.error("Generation job failed", {
         generationId: generation.id,
