@@ -21,13 +21,18 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      [
+        "sh",
+        "-c",
+        "redis-server --appendonly yes & pid=$$!; until redis-cli ping >/dev/null 2>&1; do sleep 1; done; redis-cli replicaof no one || true; wait $$pid"
+      ]
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli info replication | grep -q '^role:master'"]
       interval: 5s
       timeout: 3s
       retries: 20
