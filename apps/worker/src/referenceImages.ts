@@ -35,8 +35,13 @@ async function mirrorReferenceImage(storage: ObjectStorage, generationId: string
     contentType: imageMime.contentType
   });
 
-  if (!mirroredUrl.startsWith("http")) {
-    throw new Error("S3_PUBLIC_BASE_URL must be an HTTPS public URL for Kie image references.");
+  if (!mirroredUrl.startsWith("https://")) {
+    console.warn("Reference image storage URL is not public HTTPS; falling back to source URL for Kie.", {
+      generationId,
+      index,
+      storageUrlScheme: mirroredUrl.split(":")[0] || "unknown"
+    });
+    return url;
   }
 
   return mirroredUrl;
