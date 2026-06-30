@@ -1,4 +1,5 @@
 import { ObjectStorage } from "@covers/storage";
+import { detectImageMime } from "./imageMime.js";
 
 export async function prepareReferenceImageUrls(input: {
   generationId: string;
@@ -22,16 +23,16 @@ async function mirrorReferenceImage(storage: ObjectStorage, generationId: string
     throw new Error(`Reference image download failed: ${response.status}`);
   }
 
-  const contentType = response.headers.get("content-type") ?? "image/jpeg";
-  if (!contentType.startsWith("image/")) {
-    throw new Error(`Reference URL did not return an image: ${contentType}`);
+  const body = Buffer.from(await response.arrayBuffer());
+  const imageMime = detectImageMime(body, response.headers.get("content-type"));
+  if (!imageMime) {
+    throw new Error(`Reference URL did not return a supported image: ${response.headers.get("content-type") ?? "unknown"}`);
   }
 
-  const extension = extensionForContentType(contentType);
   const mirroredUrl = await storage.uploadBuffer({
-    key: `generations/${generationId}/references/input-${index + 1}.${extension}`,
-    body: Buffer.from(await response.arrayBuffer()),
-    contentType
+    key: `generations/${generationId}/references/input-${index + 1}.${imageMime.extension}`,
+    body,
+    contentType: imageMime.contentType
   });
 
   if (!mirroredUrl.startsWith("http")) {
@@ -39,10 +40,4 @@ async function mirrorReferenceImage(storage: ObjectStorage, generationId: string
   }
 
   return mirroredUrl;
-}
-
-function extensionForContentType(contentType: string) {
-  if (contentType.includes("png")) return "png";
-  if (contentType.includes("webp")) return "webp";
-  return "jpg";
 }
