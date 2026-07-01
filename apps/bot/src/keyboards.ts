@@ -3,12 +3,14 @@ import { InlineKeyboard } from "grammy";
 
 export function mainKeyboard() {
   return new InlineKeyboard()
-    .text("Новый проект", "project:start")
+    .text("Создать обложку", "project:start")
     .row()
-    .text("Мои проекты", "projects:mine")
+    .text("Мои лица", "faces:mine")
     .text("Шаблоны", "templates:library")
     .row()
+    .text("Мои проекты", "projects:mine")
     .text("Баланс", "balance")
+    .row()
     .text("Как это работает", "how")
     .row()
     .text("Поддержка", "support");
@@ -16,11 +18,11 @@ export function mainKeyboard() {
 
 export function sourceTypeKeyboard() {
   return new InlineKeyboard()
-    .text("Ссылка на ролик", "source:LINK")
+    .text("У меня есть ссылка", "source:LINK")
     .row()
     .text("Загрузить видео", "source:VIDEO")
     .row()
-    .text("Вставить транскрипт", "source:TRANSCRIPT")
+    .text("Вставить текст ролика", "source:TRANSCRIPT")
     .row()
     .text("В начало", "home");
 }
@@ -47,9 +49,9 @@ export function templatesKeyboard(
 
 export function referenceModeKeyboard() {
   return new InlineKeyboard()
-    .text("С моим фото", "refmode:FACE")
+    .text("С моим лицом", "refmode:FACE")
     .row()
-    .text("По референсу", "refmode:REFERENCE")
+    .text("По кадру/референсу", "refmode:REFERENCE")
     .row()
     .text("Без фото — скоро", "refmode:SOON")
     .row()
@@ -89,14 +91,14 @@ export function confirmKeyboard() {
   return new InlineKeyboard()
     .text("Собрать обложку", "confirm:generate")
     .row()
-    .text("Начать заново", "generate:start")
+    .text("Начать заново", "project:start")
     .text("В начало", "home");
 }
 
 export function packagesKeyboard(packages: Array<{ id: string; title: string; starsPrice: number; credits: number }>) {
   const keyboard = new InlineKeyboard();
   packages.forEach((pack) => {
-    keyboard.text(`${pack.title}: ${pack.credits} кр. за ${pack.starsPrice} ⭐`, `buy:${pack.id}`).row();
+    keyboard.text(`${pack.title}: ${pack.credits} обложек за ${pack.starsPrice} ⭐`, `buy:${pack.id}`).row();
   });
   return keyboard;
 }

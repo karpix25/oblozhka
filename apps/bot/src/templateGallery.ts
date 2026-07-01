@@ -75,7 +75,7 @@ function templateGalleryKeyboard(input: {
   if (input.mode === "select") {
     keyboard.text("Выбрать этот шаблон", `template:${input.templateId}`).row();
   } else {
-    keyboard.text("Новый проект", "project:start").row();
+    keyboard.text("Создать обложку", "project:start").row();
   }
 
   keyboard.text("В начало", "home");

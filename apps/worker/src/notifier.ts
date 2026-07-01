@@ -27,7 +27,7 @@ export class TelegramNotifier {
       ].join("\n"),
       reply_markup: {
         inline_keyboard: [
-          [{ text: "Сгенерировать еще", callback_data: "generate:start" }],
+          [{ text: "Создать еще обложку", callback_data: "project:start" }],
           [{ text: "Поддержка", callback_data: "support" }]
         ]
       }
@@ -41,22 +41,25 @@ export class TelegramNotifier {
   async sendGenerationFailure(chatId: number) {
     await this.bot.api.sendMessage(
       chatId,
-      "Не получилось сгенерировать обложку. Кредит возвращен на баланс."
+      "Не получилось сгенерировать обложку. Баланс возвращен."
     );
   }
 
   async sendHookCandidates(chatId: number, projectId: string, hooks: Array<{ id: string; text: string }>) {
-    await this.bot.api.sendMessage(chatId, "Выберите хук для обложки:", {
+    await this.bot.api.sendMessage(chatId, "Я подготовил варианты текста для обложки. Можно выбрать вручную или доверить лучший мне.", {
       reply_markup: {
-        inline_keyboard: hooks.map((hook, index) => [
-          { text: `${index + 1}. ${hook.text}`, callback_data: `hook:${projectId}:${hook.id}` }
-        ])
+        inline_keyboard: [
+          [{ text: "Выбрать лучший автоматически", callback_data: `hook:auto:${projectId}` }],
+          ...hooks.map((hook, index) => [
+            { text: `${index + 1}. ${hook.text}`, callback_data: `hook:${projectId}:${hook.id}` }
+          ])
+        ]
       }
     });
   }
 
   async sendHookFailure(chatId: number) {
-    await this.bot.api.sendMessage(chatId, "Не получилось подготовить хуки. Если это ссылка или видео, попробуйте вставить транскрипт вручную.");
+    await this.bot.api.sendMessage(chatId, "Не получилось подготовить текст для обложки. Если это ссылка или видео, попробуйте вставить текст ролика вручную.");
   }
 }
 

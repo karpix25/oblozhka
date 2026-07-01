@@ -65,7 +65,7 @@ bot.callbackQuery("balance", async (ctx) => {
   const user = await findUserByTelegramId(prisma, ctx.from.id);
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply(`Ваш баланс: ${user?.balance ?? 0} кредитов`);
+  await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`);
 });
 
 bot.callbackQuery("support", async (ctx) => {
@@ -92,7 +92,7 @@ bot.callbackQuery("packages", async (ctx) => {
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
   if (packages.length === 0) {
-    await ctx.reply("Пакеты кредитов пока не настроены.");
+    await ctx.reply("Пакеты обложек пока не настроены.");
     return;
   }
   await ctx.reply("Выберите пакет:", { reply_markup: packagesKeyboard(packages) });
@@ -141,7 +141,7 @@ bot.on("message:successful_payment", async (ctx) => {
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   await completeStarsPayment(prisma, { userId: user.id, payment });
   const refreshed = await findUserByTelegramId(prisma, ctx.from!.id);
-  await ctx.reply(`Оплата прошла. Баланс: ${refreshed?.balance ?? 0} кредитов`);
+  await ctx.reply(`Оплата прошла. Доступно обложек: ${refreshed?.balance ?? 0}`);
 });
 
 bot.callbackQuery("generate:start", async (ctx) => {
@@ -163,7 +163,7 @@ bot.callbackQuery(/^quick:(YOUTUBE|VERTICAL)$/, async (ctx) => {
 bot.callbackQuery("refmode:SOON", async (ctx) => {
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply("Для текущей модели нужен стартовый образ. Выберите «С моим фото» или «По референсу».", {
+  await ctx.reply("Пока лучше начать с фото, кадра или референса. Так результат получается стабильнее.", {
     reply_markup: referenceModeKeyboard()
   });
 });
@@ -286,12 +286,12 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply("Задача отправлена в генерацию. Обычно это занимает до минуты.");
+    await ctx.reply("Принял задачу. Обычно обложка готова в течение минуты.");
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось создать генерацию.";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(message === "Insufficient credits." ? "Недостаточно кредитов. Пополните баланс." : message);
+    await ctx.reply(message === "Insufficient credits." ? "Недостаточно доступных обложек. Пополните баланс." : message);
   }
 });
 

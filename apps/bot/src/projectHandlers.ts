@@ -4,6 +4,7 @@ import {
   listTemplates,
   listUserProjects,
   prisma,
+  selectBestProjectHook,
   selectProjectHook,
   setProjectPlatform,
   setProjectTemplate,
@@ -11,6 +12,7 @@ import {
 } from "@covers/db";
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
+import { sendFaceLibrary } from "./faceLibrary.js";
 import { mainKeyboard, platformKeyboard, sourceTypeKeyboard } from "./keyboards.js";
 import { askGuestFace, requiresGuestFace, saveUploadedGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
 import {
@@ -20,6 +22,7 @@ import {
   sourceStartMessage,
 } from "./messages.js";
 import { deleteCallbackMessage } from "./navigation.js";
+import { platformLabel, projectStatusLabel } from "./projectLabels.js";
 import { generationJobId, generationQueue, hookJobId, hookQueue } from "./queue.js";
 import { askReferenceForGeneration, saveUploadedReferenceFace, useSavedReferenceFace } from "./referenceFaceFlow.js";
 import { type BotContext, resetWizard } from "./session.js";
@@ -40,14 +43,18 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
     if (projects.length === 0) {
-      await ctx.reply("Пока нет проектов. Начните с кнопки «Новый проект».", { reply_markup: mainKeyboard() });
+      await ctx.reply("Пока нет проектов. Начните с кнопки «Создать обложку».", { reply_markup: mainKeyboard() });
       return;
     }
     await ctx.reply(
       projects
-        .map((project, index) => `${index + 1}. ${project.platform ?? "без платформы"} · ${project.status} · ${project.selectedHook?.text ?? "хуки не выбраны"}`)
+        .map((project, index) => `${index + 1}. ${platformLabel(project.platform)} · ${projectStatusLabel(project.status)} · ${project.selectedHook?.text ?? "текст еще не выбран"}`)
         .join("\n")
     );
+  });
+
+  bot.callbackQuery("faces:mine", async (ctx) => {
+    await sendFaceLibrary(ctx);
   });
 
   bot.callbackQuery("templates:library", async (ctx) => {
@@ -131,8 +138,17 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
   async function enqueueHooks(ctx: BotContext) {
     if (!ctx.session.projectId) return;
     await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId) });
-    await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
+    await ctx.reply("Анализирую ролик и готовлю варианты текста для обложки.");
   }
+
+  bot.callbackQuery(/^hook:auto:(.+)$/, async (ctx) => {
+    const projectId = ctx.match[1];
+    await selectBestProjectHook(prisma, projectId);
+    ctx.session.projectId = projectId;
+    await ctx.answerCallbackQuery("Выбрал лучший вариант.");
+    await deleteCallbackMessage(ctx);
+    await askReferenceForGeneration(ctx);
+  });
 
   bot.callbackQuery(/^hook:([^:]+):(.+)$/, async (ctx) => {
     const projectId = ctx.match[1];
@@ -164,7 +180,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
 
   bot.on("message:video", async (ctx) => {
     if (ctx.session.step !== "sourceVideo") {
-      await ctx.reply("Видео получил. Чтобы сделать из него проект, нажмите «Новый проект» → «Загрузить видео».", {
+      await ctx.reply("Видео получил. Чтобы использовать его для обложки, нажмите «Создать обложку» → «Загрузить видео».", {
         reply_markup: mainKeyboard()
       });
       return;
@@ -193,7 +209,7 @@ export async function handleProjectText(ctx: BotContext) {
   if (ctx.session.step === "sourceTranscript") {
     const text = ctx.message?.text?.trim() ?? "";
     if (text.length < 80) {
-      await ctx.reply("Транскрипт слишком короткий. Вставьте хотя бы несколько абзацев, чтобы AI нашёл сильный хук.");
+      await ctx.reply("Текст слишком короткий. Вставьте хотя бы несколько абзацев, чтобы я понял смысл ролика.");
       return true;
     }
     await createProjectFromSource(ctx, "TRANSCRIPT", { text });
@@ -206,7 +222,7 @@ export async function handleProjectText(ctx: BotContext) {
 export async function handleProjectPhoto(ctx: BotContext, token: string) {
   if (await saveUploadedGuestFace(ctx, token)) {
     await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId!) });
-    await ctx.reply("Анализирую ролик и готовлю 5 сильных хуков для CTR. Пришлю варианты отдельным сообщением.");
+    await ctx.reply("Сохранил второе лицо. Анализирую ролик и готовлю варианты текста для обложки.");
     return true;
   }
 
@@ -229,7 +245,7 @@ export async function handleProjectPhoto(ctx: BotContext, token: string) {
   const imageUrl = telegramFileUrl(token, file.file_path);
   await saveUploadedReferenceFace(ctx, { token, photo, filePath: file.file_path });
   await createAndEnqueueGeneration(ctx, user.id, imageUrl);
-  await ctx.reply("Принял визуальную основу. Генерирую обложку по выбранному хуку и шаблону.");
+  await ctx.reply("Принял визуальную основу. Собираю обложку в выбранном стиле.");
   return true;
 }
 
@@ -237,7 +253,7 @@ async function enqueueGenerationFromReference(ctx: BotContext, referenceImageUrl
   if (!ctx.session.projectId) return;
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   await createAndEnqueueGeneration(ctx, user.id, referenceImageUrl);
-  await ctx.reply("Взял сохранённое лицо. Генерирую обложку по выбранному хуку и шаблону.");
+  await ctx.reply("Взял сохранённое лицо. Собираю обложку в выбранном стиле.");
 }
 
 async function createAndEnqueueGeneration(ctx: BotContext, userId: string, referenceImageUrl: string) {

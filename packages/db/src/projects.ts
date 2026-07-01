@@ -86,6 +86,37 @@ export async function selectProjectHook(db: DbClient, projectId: string, hookId:
   });
 }
 
+export async function selectBestProjectHook(db: DbClient, projectId: string) {
+  return db.$transaction(async (tx) => {
+    const bestHook = await tx.hookCandidate.findFirst({
+      where: { projectId },
+      orderBy: [{ score: "desc" }, { createdAt: "asc" }]
+    });
+    if (!bestHook) {
+      throw new Error("Hook candidates were not found.");
+    }
+
+    await tx.hookCandidate.updateMany({
+      where: { projectId },
+      data: { isSelected: false }
+    });
+    await tx.hookCandidate.update({
+      where: { id: bestHook.id },
+      data: { isSelected: true }
+    });
+    return tx.project.update({
+      where: { id: projectId },
+      data: { selectedHookId: bestHook.id },
+      include: {
+        selectedHook: true,
+        selectedTemplate: true,
+        sourceAssets: true,
+        transcripts: true
+      }
+    });
+  });
+}
+
 export async function markProjectStatus(
   db: DbClient,
   projectId: string,
