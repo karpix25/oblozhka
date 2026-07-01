@@ -300,9 +300,32 @@ export const VERTICAL_STYLE_PROFILES: VerticalStyleProfile[] = [
     negativeRules: ["No messy UI screenshots.", "No crowded lower third.", "Do not use bright cartoon colors."]
   },
   {
+    slug: "vertical-text-on-image",
+    title: "Text on image",
+    referenceImage: "brand/reference-styles/vertical/13-vertical-text-on-image.png",
+    useCases: ["AI tool", "software update", "tech explainer", "creator tutorial", "product reveal"],
+    semanticMechanic: "Huge typography integrated behind a presenter turns a normal talking-head frame into a premium product announcement.",
+    composition: {
+      layout: "Presenter centered in the lower half, oversized headline behind the head and shoulders, small descriptor above.",
+      primarySubject: "Presenter holding or demonstrating a product, screen, tablet, or proof object.",
+      supportingElements: ["dark studio", "blurred screens", "held device or product", "thin teal border/accent"],
+      depth: "The huge word sits behind the presenter; the held object is foreground proof."
+    },
+    layers: ["dark studio background", "small top descriptor", "oversized headline behind subject", "presenter", "held proof object", "teal accent frame"],
+    textSystem: {
+      role: "The oversized word is the main visual identity; the small top line gives context.",
+      placement: "Small descriptor near top; huge word across upper-middle behind the subject.",
+      typography: "Condensed techno or heavy sans, huge white headline with muted teal descriptor.",
+      maxWords: 5
+    },
+    visualRules: ["huge text behind subject", "premium dark tech look", "held proof object", "clean subject masking", "minimal color palette"],
+    promptRules: ["Make the main word enormous and partially hidden behind the presenter.", "Use the held object as proof of the topic.", "Keep the small descriptor short and secondary."],
+    negativeRules: ["Do not place text over the face.", "No multiple competing headlines.", "Avoid bright playful colors."]
+  },
+  {
     slug: "vertical-object-in-hand",
     title: "Object in hand",
-    referenceImage: "brand/reference-styles/vertical/13-vertical-object-in-hand.png",
+    referenceImage: "brand/reference-styles/vertical/14-vertical-object-in-hand.png",
     useCases: ["prize", "giveaway", "food", "money", "challenge reward", "product reveal"],
     semanticMechanic: "A smiling creator holding the reward object in front of a value background makes the offer tangible.",
     composition: {

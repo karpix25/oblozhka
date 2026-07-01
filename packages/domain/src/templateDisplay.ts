@@ -29,6 +29,7 @@ const TEMPLATE_RU_TITLES: Record<string, string> = {
   "big-action": "Большое действие",
   "floating-object": "Парящий объект",
   "background-split": "Фон с интерфейсом",
+  "vertical-text-on-image": "Текст поверх фото",
   "vertical-object-in-hand": "Предмет в руках",
   "faceless-pov": "POV без лица",
   "foreground-focus": "Объект на первом плане",
