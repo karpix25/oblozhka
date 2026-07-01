@@ -5,4 +5,5 @@ export * from "./queues.js";
 export * from "./templates.js";
 export * from "./templateDisplay.js";
 export * from "./types.js";
+export * from "./verticalStyleProfiles.js";
 export * from "./youtubeStyleProfiles.js";

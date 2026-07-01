@@ -1,4 +1,5 @@
 import type { ProjectPlatform } from "./types.js";
+import { VERTICAL_STYLE_PROFILES } from "./verticalStyleProfiles.js";
 import { YOUTUBE_STYLE_PROFILES } from "./youtubeStyleProfiles.js";
 
 export type TemplateDefinition = {
@@ -10,25 +11,46 @@ export type TemplateDefinition = {
   sortOrder: number;
 };
 
-const youtubeReferenceTemplates: TemplateDefinition[] = YOUTUBE_STYLE_PROFILES.map((profile, index) => ({
-  slug: profile.slug,
-  title: profile.title,
-  platform: "YOUTUBE",
-  previewImageUrl: `templates/${profile.slug}.png`,
-  promptRules: [
-    `Hook mechanic: ${profile.semanticMechanic}`,
-    `Layout: ${profile.composition.layout}`,
-    `Text policy: ${profile.textSystem.role} ${profile.textSystem.placement} ${profile.textSystem.typography}`,
-    `Max text words: ${profile.textSystem.maxWords}`,
-    `Visual rules: ${profile.visualRules.join("; ")}`,
-    `Prompt rules: ${profile.promptRules.join("; ")}`,
-    `Avoid: ${profile.negativeRules.join("; ")}`
-  ].join("\n"),
-  sortOrder: (index + 1) * 10
-}));
+type TemplateStyleProfile = {
+  slug: string;
+  title: string;
+  semanticMechanic: string;
+  composition: { layout: string };
+  textSystem: { role: string; placement: string; typography: string; maxWords: number };
+  visualRules: string[];
+  promptRules: string[];
+  negativeRules: string[];
+};
+
+function profileTemplates(
+  profiles: TemplateStyleProfile[],
+  platform: ProjectPlatform,
+  startOrder = 10
+): TemplateDefinition[] {
+  return profiles.map((profile, index) => ({
+    slug: profile.slug,
+    title: profile.title,
+    platform,
+    previewImageUrl: `templates/${profile.slug}.png`,
+    promptRules: [
+      `Hook mechanic: ${profile.semanticMechanic}`,
+      `Layout: ${profile.composition.layout}`,
+      `Text policy: ${profile.textSystem.role} ${profile.textSystem.placement} ${profile.textSystem.typography}`,
+      `Max text words: ${profile.textSystem.maxWords}`,
+      `Visual rules: ${profile.visualRules.join("; ")}`,
+      `Prompt rules: ${profile.promptRules.join("; ")}`,
+      `Avoid: ${profile.negativeRules.join("; ")}`
+    ].join("\n"),
+    sortOrder: startOrder + index * 10
+  }));
+}
+
+const youtubeReferenceTemplates = profileTemplates(YOUTUBE_STYLE_PROFILES, "YOUTUBE");
+const verticalReferenceTemplates = profileTemplates(VERTICAL_STYLE_PROFILES, "INSTAGRAM_TIKTOK");
 
 export const DEFAULT_TEMPLATES: TemplateDefinition[] = [
   ...youtubeReferenceTemplates,
+  ...verticalReferenceTemplates,
   {
     slug: "faceless-pov",
     title: "Faceless POV",
