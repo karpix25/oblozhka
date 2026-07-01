@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_TEMPLATES, getFormatSpec } from "@covers/domain";
+import { DEFAULT_TEMPLATES, getFormatSpec, templateDisplayName } from "@covers/domain";
 import { KieImageClient, OpenRouterPromptPlanner } from "@covers/generation-ai";
 import { SourceIngestionService } from "@covers/media-source";
 import { ObjectStorage } from "@covers/storage";
@@ -52,7 +52,7 @@ const faceUrl = await uploadLocalFile(clients.storage, {
 
 const results = [];
 for (const [index, template] of templates.entries()) {
-  console.log(`local-test: [${index + 1}/${templates.length}] ${template.title}`);
+  console.log(`local-test: [${index + 1}/${templates.length}] ${templateDisplayName(template.slug, template.title)}`);
   results.push(await runTemplate({ index, template, transcript, faceUrl, repoRoot, outputDir, runId, spec, ...clients }));
   await writeCurrentReport(results);
 }

@@ -1,4 +1,4 @@
-import { DEFAULT_NICHES, DEFAULT_STYLES, FORMAT_SPECS, type ProjectPlatform } from "@covers/domain";
+import { DEFAULT_NICHES, DEFAULT_STYLES, FORMAT_SPECS, templateDisplayName, type ProjectPlatform } from "@covers/domain";
 import { InlineKeyboard } from "grammy";
 
 export function mainKeyboard() {
@@ -40,7 +40,7 @@ export function templatesKeyboard(
   templates: Array<{ id: string; title: string; slug: string; platform: ProjectPlatform }>
 ) {
   const keyboard = new InlineKeyboard();
-  templates.forEach((template) => keyboard.text(template.title, `template:${template.id}`).row());
+  templates.forEach((template) => keyboard.text(templateDisplayName(template.slug, template.title), `template:${template.id}`).row());
   keyboard.text("В начало", "home");
   return keyboard;
 }

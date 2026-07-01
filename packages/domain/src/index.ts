@@ -3,5 +3,6 @@ export * from "./credits.js";
 export * from "./formats.js";
 export * from "./queues.js";
 export * from "./templates.js";
+export * from "./templateDisplay.js";
 export * from "./types.js";
 export * from "./youtubeStyleProfiles.js";

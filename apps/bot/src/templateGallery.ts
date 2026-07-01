@@ -1,4 +1,4 @@
-import type { ProjectPlatform } from "@covers/domain";
+import { templateDisplayName, type ProjectPlatform } from "@covers/domain";
 import { InlineKeyboard, InputFile } from "grammy";
 import { templatePreviewPath } from "./assets.js";
 import { mainKeyboard } from "./keyboards.js";
@@ -86,7 +86,7 @@ function templateCaption(template: TemplateCard, page: number, total: number) {
   return [
     `${platformLabels[template.platform]} · ${page + 1}/${total}`,
     "",
-    template.title
+    templateDisplayName(template.slug, template.title)
   ].join("\n");
 }
 

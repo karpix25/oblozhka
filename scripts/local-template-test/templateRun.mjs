@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { templateDisplayName } from "@covers/domain";
 import sharp from "sharp";
 import { templatePreviewPath, uploadLocalFile } from "./assets.mjs";
 import { reviewPair } from "./review.mjs";
@@ -90,7 +91,8 @@ function templateResult(input, data) {
   return {
     index: input.index + 1,
     slug: input.template.slug,
-    title: input.template.title,
+    title: templateDisplayName(input.template.slug, input.template.title),
+    technicalTitle: input.template.title,
     ...data
   };
 }
