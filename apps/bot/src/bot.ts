@@ -17,6 +17,7 @@ import {
 } from "@covers/telegram-payments";
 import { Bot, session } from "grammy";
 import { randomUUID } from "node:crypto";
+import { handleBottomMenuText, showBottomMenu } from "./bottomMenu.js";
 import {
   confirmKeyboard,
   formatKeyboard,
@@ -55,6 +56,7 @@ registerProjectHandlers(bot, token);
 bot.command("start", async (ctx) => {
   await upsertTelegramUser(prisma, profileFromContext(ctx));
   await sendOnboarding(ctx, ctx.from?.first_name);
+  await showBottomMenu(ctx);
 });
 
 bot.command("terms", async (ctx) => ctx.reply(termsMessage()));
@@ -237,6 +239,7 @@ bot.on("message:photo", async (ctx) => {
 });
 
 bot.on("message:text", async (ctx) => {
+  if (await handleBottomMenuText(ctx)) return;
   if (await handleProjectText(ctx)) return;
 
   if (ctx.session.step === "topic") {

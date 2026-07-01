@@ -80,9 +80,9 @@ function templateGalleryKeyboard(input: {
   templateId: string;
 }) {
   const keyboard = new InlineKeyboard()
-    .text(platformTab("YouTube", input.platform === "YOUTUBE"), "templates:browse:YOUTUBE:0")
-    .text(platformTab("Reels/TikTok", input.platform === "INSTAGRAM_TIKTOK"), "templates:browse:INSTAGRAM_TIKTOK:0")
-    .text(platformTab("Faceless", input.platform === "FACELESS"), "templates:browse:FACELESS:0")
+    .text(platformTab("▶️ YouTube", input.platform === "YOUTUBE"), "templates:browse:YOUTUBE:0")
+    .text(platformTab("📱 Reels/TikTok", input.platform === "INSTAGRAM_TIKTOK"), "templates:browse:INSTAGRAM_TIKTOK:0")
+    .text(platformTab("🎭 Faceless", input.platform === "FACELESS"), "templates:browse:FACELESS:0")
     .row();
 
   if (input.total > 1) {
@@ -94,12 +94,12 @@ function templateGalleryKeyboard(input: {
   }
 
   if (input.mode === "select") {
-    keyboard.text("Выбрать этот шаблон", `template:${input.templateId}`).row();
+    keyboard.text("✅ Выбрать этот шаблон", `template:${input.templateId}`).row();
   } else {
-    keyboard.text("Создать обложку", "project:start").row();
+    keyboard.text("🎨 Создать обложку", "project:start").row();
   }
 
-  keyboard.text("В начало", "home");
+  keyboard.text("🏠 В начало", "home");
   return keyboard;
 }
 
@@ -112,7 +112,7 @@ function templateCaption(template: TemplateCard, page: number, total: number) {
 }
 
 function platformTab(label: string, active: boolean) {
-  return active ? `🟡 ${label}` : label;
+  return active ? `✓ ${label}` : label;
 }
 
 function normalizePage(page: number, total: number) {

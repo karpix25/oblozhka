@@ -76,9 +76,9 @@ export async function saveUploadedGuestFace(ctx: BotContext, token: string) {
 function guestFaceKeyboard(faces: Array<{ id: string; title: string | null; createdAt: Date }>) {
   const keyboard = new InlineKeyboard();
   faces.forEach((face, index) => {
-    keyboard.text(face.title ?? `Гость ${index + 1}`, `guestface:use:${face.id}`).row();
+    keyboard.text(`👥 ${face.title ?? `Гость ${index + 1}`}`, `guestface:use:${face.id}`).row();
   });
-  keyboard.text("Загрузить новое фото", "guestface:upload").row().text("В начало", "home");
+  keyboard.text("📤 Загрузить новое фото", "guestface:upload").row().text("🏠 В начало", "home");
   return keyboard;
 }
 

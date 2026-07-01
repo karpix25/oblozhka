@@ -7,8 +7,6 @@ import { profileFromContext } from "./userProfile.js";
 export async function sendFaceLibrary(ctx: BotContext) {
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const faces = await listUserFaceAssets(prisma, user.id, 10);
-  await ctx.answerCallbackQuery();
-  await deleteCallbackMessage(ctx);
 
   if (faces.length === 0) {
     await ctx.reply("Сохранённых лиц пока нет. Загрузите фото во время создания обложки, и я сохраню его для следующих проектов.", {
@@ -27,4 +25,12 @@ export async function sendFaceLibrary(ctx: BotContext) {
     ].join("\n"),
     { reply_markup: mainKeyboard() }
   );
+}
+
+export async function openFaceLibrary(ctx: BotContext, input: { fromCallback?: boolean } = {}) {
+  if (input.fromCallback) {
+    await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+  }
+  await sendFaceLibrary(ctx);
 }

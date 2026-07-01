@@ -68,9 +68,9 @@ export async function saveUploadedReferenceFace(
 function referenceFaceKeyboard(faces: Array<{ id: string; title: string | null; createdAt: Date }>) {
   const keyboard = new InlineKeyboard();
   faces.forEach((face, index) => {
-    keyboard.text(face.title ?? `Лицо ${index + 1}`, `referenceface:use:${face.id}`).row();
+    keyboard.text(`👤 ${face.title ?? `Лицо ${index + 1}`}`, `referenceface:use:${face.id}`).row();
   });
-  keyboard.text("Загрузить новое фото", "referenceface:upload").row().text("В начало", "home");
+  keyboard.text("📤 Загрузить новое фото", "referenceface:upload").row().text("🏠 В начало", "home");
   return keyboard;
 }
 

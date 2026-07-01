@@ -2,7 +2,6 @@ import {
   createGenerationFromProject,
   createProject,
   listTemplates,
-  listUserProjects,
   prisma,
   selectBestProjectHook,
   selectProjectHook,
@@ -12,7 +11,7 @@ import {
 } from "@covers/db";
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
-import { sendFaceLibrary } from "./faceLibrary.js";
+import { openFaceLibrary } from "./faceLibrary.js";
 import { mainKeyboard, platformKeyboard, sourceTypeKeyboard } from "./keyboards.js";
 import { askGuestFace, requiresGuestFace, saveUploadedGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
 import {
@@ -22,7 +21,7 @@ import {
   sourceStartMessage,
 } from "./messages.js";
 import { deleteCallbackMessage } from "./navigation.js";
-import { platformLabel, projectStatusLabel } from "./projectLabels.js";
+import { sendProjectList } from "./projectList.js";
 import { generationJobId, generationQueue, hookJobId, hookQueue } from "./queue.js";
 import { askReferenceForGeneration, saveUploadedReferenceFace, useSavedReferenceFace } from "./referenceFaceFlow.js";
 import { type BotContext, resetWizard } from "./session.js";
@@ -38,23 +37,11 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
   });
 
   bot.callbackQuery("projects:mine", async (ctx) => {
-    const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
-    const projects = await listUserProjects(prisma, user.id);
-    await ctx.answerCallbackQuery();
-    await deleteCallbackMessage(ctx);
-    if (projects.length === 0) {
-      await ctx.reply("Пока нет проектов. Начните с кнопки «Создать обложку».", { reply_markup: mainKeyboard() });
-      return;
-    }
-    await ctx.reply(
-      projects
-        .map((project, index) => `${index + 1}. ${platformLabel(project.platform)} · ${projectStatusLabel(project.status)} · ${project.selectedHook?.text ?? "текст еще не выбран"}`)
-        .join("\n")
-    );
+    await sendProjectList(ctx, { fromCallback: true });
   });
 
   bot.callbackQuery("faces:mine", async (ctx) => {
-    await sendFaceLibrary(ctx);
+    await openFaceLibrary(ctx, { fromCallback: true });
   });
 
   bot.callbackQuery("templates:library", async (ctx) => {
