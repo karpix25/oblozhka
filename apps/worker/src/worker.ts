@@ -18,6 +18,7 @@ import { Worker } from "bullmq";
 import { createPreview, normalizeFinal } from "./imageProcessing.js";
 import { TelegramNotifier } from "./notifier.js";
 import { prepareReferenceImageUrls } from "./referenceImages.js";
+import { prepareTemplateReferenceUrl } from "./templateReference.js";
 
 const redisUrl = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
 const connection = {
@@ -77,11 +78,17 @@ new Worker<GenerationJobData, void, string>(
         urls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
         storage
       });
+      const templateReferenceUrl = await prepareTemplateReferenceUrl({
+        generationId: generation.id,
+        templateSlug: generation.template?.slug,
+        storage
+      });
+      const imageReferenceUrls = templateReferenceUrl ? [...referenceUrls, templateReferenceUrl] : referenceUrls;
 
       const result = await imageClient.generate({
         prompt: plan.prompt,
-        imageUrl: referenceUrls[0],
-        imageUrls: referenceUrls,
+        imageUrl: imageReferenceUrls[0],
+        imageUrls: imageReferenceUrls,
         aspectRatio: spec.aspectRatio
       });
       const finalImage = await normalizeFinal(result.bytes, spec.width, spec.height);
