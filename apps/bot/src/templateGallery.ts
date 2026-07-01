@@ -1,5 +1,5 @@
 import { templateDisplayName, type ProjectPlatform } from "@covers/domain";
-import { InlineKeyboard, InputFile } from "grammy";
+import { InlineKeyboard, InputFile, InputMediaBuilder } from "grammy";
 import { templatePreviewPath } from "./assets.js";
 import { mainKeyboard } from "./keyboards.js";
 import type { BotContext } from "./session.js";
@@ -41,14 +41,35 @@ export async function sendTemplateGallery(
     templateId: template.id
   });
 
+  const photo = new InputFile(templatePreviewPath(template.slug));
+  const caption = templateCaption(template, page, templates.length);
+
   if (input.replace) {
-    await ctx.deleteMessage().catch(() => undefined);
+    const edited = await editTemplateGalleryMessage(ctx, photo, caption, keyboard);
+    if (edited) return;
   }
 
-  await ctx.replyWithPhoto(new InputFile(templatePreviewPath(template.slug)), {
-    caption: templateCaption(template, page, templates.length),
+  await ctx.replyWithPhoto(photo, {
+    caption,
     reply_markup: keyboard
   });
+}
+
+async function editTemplateGalleryMessage(
+  ctx: BotContext,
+  photo: InputFile,
+  caption: string,
+  keyboard: InlineKeyboard
+) {
+  try {
+    await ctx.editMessageMedia(InputMediaBuilder.photo(photo, { caption }), {
+      reply_markup: keyboard
+    });
+    return true;
+  } catch {
+    await ctx.deleteMessage().catch(() => undefined);
+    return false;
+  }
 }
 
 function templateGalleryKeyboard(input: {
