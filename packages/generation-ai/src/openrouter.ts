@@ -1,3 +1,10 @@
+import { buildFallbackHooks } from "./hookFallback.js";
+import { buildHookContext } from "./hookContext.js";
+import { deriveMaxHookWords } from "./hookText.js";
+import type { HookCandidate, HookContext } from "./hookTypes.js";
+import { normalizeAndRankHooks } from "./hookValidation.js";
+import { repairImagePrompt, validateImagePrompt } from "./promptValidator.js";
+import { referenceRoleContract } from "./referenceContract.js";
 import type { PromptPlan, PromptPlanningInput } from "./types.js";
 
 type OpenRouterMessage = {
@@ -52,11 +59,15 @@ export class OpenRouterPromptPlanner {
   async generateHooks(input: {
     transcript: string;
     platform: string;
+    theme?: string;
     templateTitle?: string;
     templateRules?: string;
-  }): Promise<Array<{ text: string; angle?: string; score?: number }>> {
+  }): Promise<HookCandidate[]> {
+    const hookContext = buildHookContext({ transcript: input.transcript, theme: input.theme });
+    const maxWords = deriveMaxHookWords(input.templateRules);
+
     if (!this.apiKey) {
-      return this.fallbackHooks(input.transcript);
+      return this.fallbackHooks(hookContext, maxWords);
     }
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -82,7 +93,11 @@ export class OpenRouterPromptPlanner {
               "Верни JSON: {\"hooks\":[{\"text\":\"...\",\"angle\":\"...\",\"score\":90}]}",
               "Нужно 5 коротких русских hook-текстов для обложки.",
               "До 5 слов, крупно читается в превью, усиливает конфликт/интригу.",
+              "Каждый хук должен опираться на конкретику из ролика: объект, цифру, цену, ошибку, контраст, результат или скрытую причину.",
+              "Не используй общие фразы без смысла: Я НЕ ОЖИДАЛ, ТАК НЕЛЬЗЯ, ВСЁ ИЗМЕНИЛОСЬ, ЭТО ВАЖНО, СМОТРИ ДО КОНЦА.",
+              "Подбирай CTR-механику под шаблон: contrast, mistake, hidden reason, deadline/countdown, metric, transformation, object proof.",
               `Платформа: ${input.platform}.`,
+              `Тема: ${input.theme ?? "не указана"}.`,
               `Шаблон: ${input.templateTitle ?? "не выбран"}.`,
               `Правила шаблона: ${input.templateRules ?? "нет"}.`,
               "Текст ролика:",
@@ -99,21 +114,23 @@ export class OpenRouterPromptPlanner {
 
     const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const content = json.choices?.[0]?.message?.content;
-    if (!content) return this.fallbackHooks(input.transcript);
+    if (!content) return this.fallbackHooks(hookContext, maxWords);
 
     try {
       const parsed = JSON.parse(content) as { hooks?: Array<{ text?: string; angle?: string; score?: number }> };
-      const hooks = parsed.hooks
+      const rawHooks = parsed.hooks
         ?.filter((hook) => hook.text)
         .map((hook) => ({ text: hook.text!, angle: hook.angle, score: hook.score ?? 0 }));
-      return hooks?.length ? hooks : this.fallbackHooks(input.transcript);
+      const hooks = normalizeAndRankHooks(rawHooks ?? [], { context: hookContext, maxWords });
+      return hooks.length ? hooks : this.fallbackHooks(hookContext, maxWords);
     } catch {
-      return this.fallbackHooks(input.transcript);
+      return this.fallbackHooks(hookContext, maxWords);
     }
   }
 
   private messages(input: PromptPlanningInput): OpenRouterMessage[] {
     const templateGuide = this.templateGuide(input);
+    const roleContract = referenceRoleContract(input);
     const userContent: OpenRouterMessage["content"] = [
       {
         type: "text",
@@ -126,6 +143,7 @@ export class OpenRouterPromptPlanner {
           `Ниша: ${input.wizard.niche}.`,
           `Стиль: ${input.wizard.style}.`,
           templateGuide,
+          roleContract,
           `Текст на обложке: ${input.wizard.hookText || "без текста"}.`,
           input.wizard.guestReferenceImageUrl
             ? "Есть второй человек/гость. Используй его как отдельное лицо второго участника, особенно для podcast/podcast countdown композиций."
@@ -145,6 +163,9 @@ export class OpenRouterPromptPlanner {
     if (input.wizard.guestReferenceImageUrl) {
       userContent.push({ type: "image_url", image_url: { url: input.wizard.guestReferenceImageUrl } });
     }
+    if (input.templateReferenceImageUrl) {
+      userContent.push({ type: "image_url", image_url: { url: input.templateReferenceImageUrl } });
+    }
 
     return [
       {
@@ -159,10 +180,10 @@ export class OpenRouterPromptPlanner {
     try {
       const parsed = JSON.parse(content) as { prompt?: string; referenceAnalysis?: string };
       if (parsed.prompt) {
-        return { prompt: parsed.prompt, referenceAnalysis: parsed.referenceAnalysis, model: this.model };
+        return this.validatedPlan(parsed.prompt, input, parsed.referenceAnalysis, this.model);
       }
     } catch {
-      return { prompt: content, model: this.model };
+      return this.validatedPlan(content, input, undefined, this.model);
     }
     return this.fallbackPlan(input);
   }
@@ -179,28 +200,20 @@ export class OpenRouterPromptPlanner {
         ].join(" ")
       : `Style: ${input.wizard.style}.`;
 
-    return {
-      model: "fallback",
-      prompt: [
+    const prompt = [
         `Create a high-converting ${input.formatDescription} thumbnail, aspect ratio ${input.aspectRatio}.`,
         `Topic: ${input.wizard.topic}. Niche: ${input.wizard.niche}. ${templateRule}`,
+        referenceRoleContract(input),
         faceRule,
         input.wizard.guestReferenceImageUrl ? "Use the second uploaded face as a separate guest/person in the composition." : "",
         input.wizard.hookText ? `Large readable Russian cover text: "${input.wizard.hookText}".` : "No unnecessary text.",
         "Bold focal subject, clean background, strong contrast, readable at small size, no watermarks."
-      ].join("\n")
-    };
+      ].join("\n");
+    return this.validatedPlan(prompt, input, undefined, "fallback");
   }
 
-  private fallbackHooks(transcript: string) {
-    const short = transcript.trim().slice(0, 80) || "ЭТО ВАЖНО";
-    return [
-      { text: "Я НЕ ОЖИДАЛ", angle: "surprise", score: 80 },
-      { text: "ТАК НЕЛЬЗЯ", angle: "mistake", score: 75 },
-      { text: "ВОТ ЧТО СРАБОТАЛО", angle: "result", score: 70 },
-      { text: "ВСЁ ИЗМЕНИЛОСЬ", angle: "turning point", score: 65 },
-      { text: short.toUpperCase(), angle: "summary", score: 50 }
-    ];
+  private fallbackHooks(context: HookContext, maxWords?: number): HookCandidate[] {
+    return buildFallbackHooks(context, maxWords);
   }
 
   private templateGuide(input: PromptPlanningInput) {
@@ -214,5 +227,16 @@ export class OpenRouterPromptPlanner {
       `Обязательные правила шаблона:\n${rules}`,
       "Эти правила важнее общих эстетических пожеланий."
     ].join("\n");
+  }
+
+  private validatedPlan(prompt: string, input: PromptPlanningInput, referenceAnalysis: string | undefined, model: string): PromptPlan {
+    const validation = validateImagePrompt(prompt, input);
+    const finalPrompt = validation.ok ? prompt : repairImagePrompt(prompt, input, validation.issues);
+    return {
+      prompt: finalPrompt,
+      referenceAnalysis,
+      model,
+      validationIssues: validation.issues.length ? validation.issues : undefined
+    };
   }
 }

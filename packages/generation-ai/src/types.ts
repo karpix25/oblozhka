@@ -4,6 +4,7 @@ export type PromptPlan = {
   prompt: string;
   referenceAnalysis?: string;
   model: string;
+  validationIssues?: string[];
 };
 
 export type ImageGenerationInput = {
@@ -29,4 +30,5 @@ export type PromptPlanningInput = {
     title?: string | null;
     promptRules?: string | null;
   };
+  templateReferenceImageUrl?: string;
 };

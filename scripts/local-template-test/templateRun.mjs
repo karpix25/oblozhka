@@ -13,7 +13,7 @@ export async function runTemplate(input) {
       contentType: "image/png"
     });
     const hook = await firstHook(input.promptPlanner, input);
-    const plan = await planPrompt(input, hook);
+    const plan = await planPrompt(input, hook, templateUrl);
     const outputPath = await generateImage(input, plan, templateUrl);
     const generatedUrl = await uploadGenerated(input, outputPath);
     const review = await reviewPair({ template: input.template, templateUrl, generatedUrl, hook });
@@ -39,7 +39,7 @@ async function firstHook(planner, input) {
   return hooks[0]?.text ?? "СМОТРИ ЧТО ВЫШЛО";
 }
 
-async function planPrompt(input, hook) {
+async function planPrompt(input, hook, templateUrl) {
   return input.promptPlanner.plan({
     wizard: {
       format: "YOUTUBE",
@@ -57,7 +57,8 @@ async function planPrompt(input, hook) {
       slug: input.template.slug,
       title: input.template.title,
       promptRules: input.template.promptRules
-    }
+    },
+    templateReferenceImageUrl: templateUrl
   });
 }
 

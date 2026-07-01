@@ -46,6 +46,11 @@ new Worker<GenerationJobData, void, string>(
     const spec = getFormatSpec(generation.format);
 
     try {
+      const templateReferenceUrl = await prepareTemplateReferenceUrl({
+        generationId: generation.id,
+        templateSlug: generation.template?.slug,
+        storage
+      });
       const plan = await promptPlanner.plan({
         wizard: {
           format: generation.format,
@@ -65,22 +70,22 @@ new Worker<GenerationJobData, void, string>(
               title: generation.template.title,
               promptRules: generation.template.promptRules
             }
-          : undefined
+          : undefined,
+        templateReferenceImageUrl: templateReferenceUrl
       });
       await updateGenerationPrompt(prisma, generation.id, {
         prompt: plan.prompt,
         referenceAnalysis: plan.referenceAnalysis,
-        providerMeta: { promptPlannerModel: plan.model }
+        providerMeta: {
+          promptPlannerModel: plan.model,
+          promptValidationIssues: plan.validationIssues,
+          templateReferenceUrl
+        }
       });
 
       const referenceUrls = await prepareReferenceImageUrls({
         generationId: generation.id,
         urls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
-        storage
-      });
-      const templateReferenceUrl = await prepareTemplateReferenceUrl({
-        generationId: generation.id,
-        templateSlug: generation.template?.slug,
         storage
       });
       const imageReferenceUrls = templateReferenceUrl ? [...referenceUrls, templateReferenceUrl] : referenceUrls;

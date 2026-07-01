@@ -83,14 +83,14 @@ export const YOUTUBE_STYLE_PROFILES: YoutubeStyleProfile[] = [
     },
     layers: ["black background", "two speaker cutouts", "microphones", "white headline", "yellow number block", "bottom word line"],
     textSystem: {
-      role: "The number or timeframe is the click trigger.",
-      placement: "Center stack, with number isolated inside a yellow box.",
-      typography: "Condensed bold uppercase; yellow box for countdown.",
+      role: "Deadline, duration, or step count is the click trigger; the yellow box must not imply money.",
+      placement: "Center stack, with only the deadline, time window, or step count isolated inside a yellow box.",
+      typography: "Condensed bold uppercase; yellow box for countdown/time/steps only.",
       maxWords: 7
     },
     visualRules: ["number-first readability", "urgent contrast", "symmetrical face balance", "no decorative noise"],
-    promptRules: ["Include a strong numeric promise or deadline.", "Make the number the most memorable element.", "Use black/yellow/white only unless a brand accent is required."],
-    negativeRules: ["Do not bury the number.", "Do not use more than one highlight color.", "Do not add long sentences."]
+    promptRules: ["Use the yellow box only for a deadline, time window, or step count.", "Make the countdown constraint the most memorable element.", "Use black/yellow/white only unless a brand accent is required."],
+    negativeRules: ["Do not put money, revenue, price, or salary claims in the yellow box.", "Do not bury the number.", "Do not add long sentences."]
   },
   {
     slug: "simple-text",
@@ -124,18 +124,18 @@ export const YOUTUBE_STYLE_PROFILES: YoutubeStyleProfile[] = [
     composition: {
       layout: "Presenter on one side, large whiteboard on the other with icons and one big claim.",
       primarySubject: "Expert holding marker or pointing at board.",
-      supportingElements: ["large number", "simple icons", "line/underline", "one arrow or connector"],
+      supportingElements: ["large number or claim", "up to two simple diagram blocks", "one line/underline or connector"],
       depth: "Presenter overlaps the board edge; board remains clean and flat."
     },
-    layers: ["soft room background", "presenter", "whiteboard panel", "large number", "icons", "blue underline or connector"],
+    layers: ["soft room background", "presenter", "whiteboard panel", "large number or claim", "two diagram blocks maximum", "blue underline or connector"],
     textSystem: {
       role: "The board is the hook and the explanation at once.",
-      placement: "Inside board area, top-heavy with icons below.",
-      typography: "Bold black sans for number; simple icon labels if needed.",
+      placement: "Inside board area, split into no more than two large blocks.",
+      typography: "Bold black sans for the main claim; no tiny labels.",
       maxWords: 4
     },
     visualRules: ["white clean surface", "one blue accent", "large readable number", "educational icons", "marker in hand"],
-    promptRules: ["Create a teachable diagram, not a complex infographic.", "Use only 2-3 icons.", "Make the main claim readable instantly."],
+    promptRules: ["Create a teachable diagram, not a complex infographic.", "Use two large explanation blocks maximum.", "Make every board element readable instantly; skip tiny labels."],
     negativeRules: ["No dense charts.", "No tiny labels.", "No handwritten clutter."]
   },
   {
@@ -165,23 +165,23 @@ export const YOUTUBE_STYLE_PROFILES: YoutubeStyleProfile[] = [
     slug: "history",
     title: "History",
     referenceImage: "brand/reference-styles/youtube/07-history.png",
-    useCases: ["biography", "sports story", "crime-to-success arc", "origin story"],
-    semanticMechanic: "A split identity and opposing worlds show transformation or hidden backstory.",
+    useCases: ["biography", "sports story", "crime-to-success arc", "origin story", "hidden contrast"],
+    semanticMechanic: "Two Worlds / Hidden Contrast: opposing contexts reveal the backstory, contradiction, or transformation.",
     composition: {
-      layout: "Central subject split vertically into two identities, with different worlds left and right.",
-      primarySubject: "Face/body split down the middle, one side past/context, one side present/status.",
-      supportingElements: ["crime scene or origin environment", "stadium or success environment", "torn paper seam"],
-      depth: "Subject cutout sits above both backgrounds; split seam is tactile and central."
+      layout: "Central subject between two opposing worlds, either split-body or framed by contrasting backgrounds.",
+      primarySubject: "Person, artifact, place, or symbol that connects the two worlds.",
+      supportingElements: ["origin or hidden-context environment", "public outcome or opposing environment", "visible divider or contrast boundary"],
+      depth: "Subject cutout sits above both backgrounds; the contrast boundary stays clear and central."
     },
-    layers: ["left contextual world", "right aspirational world", "central split subject", "torn seam", "symbolic props", "small name/logo if relevant"],
+    layers: ["left contextual world", "right contrasting world", "central subject", "visible contrast boundary", "symbolic props", "small name/logo if relevant"],
     textSystem: {
       role: "Text is optional; the visual contrast carries the story.",
       placement: "Minimal bottom badge or none.",
       typography: "If used, bold condensed with gritty texture.",
       maxWords: 3
     },
-    visualRules: ["dramatic split", "high contrast worlds", "cinematic lighting", "symbolic storytelling", "sharp subject cutout"],
-    promptRules: ["Represent two life chapters in one face/body.", "Use clear left-right contrast.", "Make the seam visible and central."],
+    visualRules: ["dramatic two-world contrast", "cinematic lighting", "symbolic storytelling", "sharp subject cutout", "clear readable stakes"],
+    promptRules: ["Represent Two Worlds / Hidden Contrast, not only a literal before-after.", "Use clear left-right or foreground-background opposition.", "Make the contrast boundary visible and central."],
     negativeRules: ["Do not make both halves visually similar.", "Avoid long text.", "Avoid random unrelated backgrounds."]
   },
   {
@@ -221,28 +221,28 @@ export const YOUTUBE_STYLE_PROFILES: YoutubeStyleProfile[] = [
     },
     layers: ["contextual room background", "creator close-up", "left-hand object", "right-hand object", "screen content or prop detail"],
     textSystem: {
-      role: "Usually no text; objects and expression explain the challenge.",
-      placement: "Only use tiny screen text if naturally part of the object.",
-      typography: "Avoid overlay text unless needed.",
-      maxWords: 0
+      role: "Objects and expression should explain the challenge; use a short top headline only when the objects alone do not reveal the conflict.",
+      placement: "Optional top headline, otherwise only natural screen/object text.",
+      typography: "Bold compact sans if a headline is needed.",
+      maxWords: 4
     },
     visualRules: ["wide-angle close-up", "foreground objects", "surprised expression", "natural but bright lighting"],
-    promptRules: ["Use hands as composition anchors.", "Make the object readable at small size.", "Show the emotional reaction clearly."],
-    negativeRules: ["Do not add external headline text.", "Do not hide the object.", "Avoid neutral facial expression."]
+    promptRules: ["Use hands as composition anchors.", "Make the object readable at small size.", "Add a short top headline only if objects alone do not explain the conflict."],
+    negativeRules: ["Do not add a headline when the held objects already make the premise obvious.", "Do not hide the object.", "Avoid neutral facial expression."]
   },
   {
     slug: "contextual-background",
     title: "Contextual Background",
     referenceImage: "brand/reference-styles/youtube/10-contextual-background.png",
     useCases: ["mystery", "travel", "danger", "discovery", "documentary"],
-    semanticMechanic: "A creator reacts inside a high-concept scene that visually states the question.",
+    semanticMechanic: "One environment plus one mystery object creates a clean documentary question.",
     composition: {
-      layout: "Creator cutout on one side, large contextual scene and symbolic danger/object on the other.",
+      layout: "Creator cutout on one side, one large environment and one mystery object on the other.",
       primarySubject: "Presenter reacting with concern or curiosity.",
-      supportingElements: ["landmark or environment", "danger sign", "hole/door/pathway", "clear focal object"],
+      supportingElements: ["one landmark or environment", "one clear mystery object", "optional depth cue"],
       depth: "Creator in foreground; scene extends deep into background."
     },
-    layers: ["large environment", "foreground creator", "main mystery object", "warning/sign symbol", "depth haze/light"],
+    layers: ["single large environment", "foreground creator", "one mystery object", "depth haze/light"],
     textSystem: {
       role: "Text is unnecessary if the scene creates the question.",
       placement: "No overlay text by default.",
@@ -250,8 +250,8 @@ export const YOUTUBE_STYLE_PROFILES: YoutubeStyleProfile[] = [
       maxWords: 2
     },
     visualRules: ["big readable environment", "symbolic threat or mystery", "clear facial emotion", "bright documentary look"],
-    promptRules: ["Make the background itself explain the topic.", "Use one symbolic prop to create curiosity.", "Keep the creator large enough for emotion."],
-    negativeRules: ["No random fantasy elements.", "No cluttered background.", "No small signs that cannot be read."]
+    promptRules: ["Use exactly one environment and one mystery object.", "Keep any overlay text to two words maximum.", "Keep the creator large enough for emotion."],
+    negativeRules: ["No random fantasy elements.", "No cluttered background.", "No extra props competing with the mystery object."]
   },
   {
     slug: "before-after",

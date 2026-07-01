@@ -16,9 +16,10 @@ const youtubeReferenceTemplates: TemplateDefinition[] = YOUTUBE_STYLE_PROFILES.m
   platform: "YOUTUBE",
   previewImageUrl: `templates/${profile.slug}.png`,
   promptRules: [
-    profile.semanticMechanic,
+    `Hook mechanic: ${profile.semanticMechanic}`,
     `Layout: ${profile.composition.layout}`,
-    `Text: ${profile.textSystem.role} ${profile.textSystem.placement} ${profile.textSystem.typography}`,
+    `Text policy: ${profile.textSystem.role} ${profile.textSystem.placement} ${profile.textSystem.typography}`,
+    `Max text words: ${profile.textSystem.maxWords}`,
     `Visual rules: ${profile.visualRules.join("; ")}`,
     `Prompt rules: ${profile.promptRules.join("; ")}`,
     `Avoid: ${profile.negativeRules.join("; ")}`
