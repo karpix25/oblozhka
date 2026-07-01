@@ -275,6 +275,167 @@ export const YOUTUBE_STYLE_PROFILES: YoutubeStyleProfile[] = [
     visualRules: ["clear left-right contrast", "bad lighting before", "clean bright after", "same person continuity", "simple labels"],
     promptRules: ["Make the transformation obvious without explanation.", "Use different color temperature on each side.", "Keep the split vertical and clean."],
     negativeRules: ["Do not mix before and after elements.", "Do not add more than two labels.", "Do not make both sides equally polished."]
+  },
+  {
+    slug: "multi-pov",
+    title: "MULTI POV",
+    referenceImage: "brand/reference-styles/youtube/12-multi-pov.png",
+    useCases: ["self-improvement", "challenge", "year project", "habit building", "creator journey"],
+    semanticMechanic: "Multiple POV slices prove a long journey by showing action, work, and proof object in one cinematic frame.",
+    composition: {
+      layout: "Three vertical cinematic panels with one giant lowercase word crossing the center.",
+      primarySubject: "Different visual proofs of the same journey: action scene, work scene, and object/proof scene.",
+      supportingElements: ["calendar or date marker", "book/product/proof object", "dark moody lighting"],
+      depth: "Panels feel like separate scenes; giant text unifies them as the foreground graphic layer."
+    },
+    layers: ["left POV/action panel", "center work panel", "right proof object panel", "giant white word", "small date/calendar detail"],
+    textSystem: {
+      role: "One huge word names the project while small proof text adds duration.",
+      placement: "Huge word across center; small proof/date near lower center.",
+      typography: "Massive bold lowercase sans, white; optional handwritten numeric detail.",
+      maxWords: 3
+    },
+    visualRules: ["three-panel storytelling", "dark cinematic grade", "one unifying giant word", "clear proof object", "minimal text"],
+    promptRules: ["Use exactly three POV panels.", "Make each panel show a different proof angle of the same topic.", "Keep the main word huge and readable across panels."],
+    negativeRules: ["Do not make a random collage.", "Do not use more than one main word.", "Avoid bright sticker-style design."]
+  },
+  {
+    slug: "notifications",
+    title: "Notifications",
+    referenceImage: "brand/reference-styles/youtube/13-notifications.png",
+    useCases: ["jobs", "leads", "sales", "email results", "client wins", "applications"],
+    semanticMechanic: "Stacked notification proof turns an abstract result into something instantly visible and believable.",
+    composition: {
+      layout: "Creator on left with laptop foreground; stacked notification cards dominate the right side.",
+      primarySubject: "Focused creator looking toward proof cards or laptop.",
+      supportingElements: ["three notification cards", "one curved arrow", "clean neutral room", "laptop foreground"],
+      depth: "Laptop and creator sit in foreground; notifications float above background with soft shadows."
+    },
+    layers: ["neutral room background", "creator on left", "laptop foreground", "stacked notification cards", "top claim", "curved arrow"],
+    textSystem: {
+      role: "Top claim sets scale; notification cards provide proof.",
+      placement: "Large top headline, proof cards stacked mid-right.",
+      typography: "Light italic headline with soft shadow; notification text clean UI sans.",
+      maxWords: 5
+    },
+    visualRules: ["clean proof UI", "stacked cards", "soft shadows", "one arrow", "calm credible face"],
+    promptRules: ["Create 2-3 large readable notification cards.", "Make the cards the proof, not decoration.", "Use one top claim only."],
+    negativeRules: ["No tiny notification text.", "Do not add more than three cards.", "Avoid messy app interfaces."]
+  },
+  {
+    slug: "brain-rot-podcast",
+    title: "Brain ROT podcast",
+    referenceImage: "brand/reference-styles/youtube/14-brain-rot-podcast.png",
+    useCases: ["culture", "social media", "podcast warning", "attention", "AI tools"],
+    semanticMechanic: "Two-person podcast debate plus a symbolic center object frames the topic as a cultural warning.",
+    composition: {
+      layout: "Two large podcast faces on left and right, symbolic object centered above a bottom headline.",
+      primarySubject: "Two expressive podcast participants facing inward around one symbolic object.",
+      supportingElements: ["microphone", "social/app icons or symbolic object", "dark vignette", "yellow warning strip"],
+      depth: "Faces and microphone sit forward; center object floats behind headline."
+    },
+    layers: ["dark podcast background", "left face", "right face with microphone", "center symbolic object", "bottom white headline", "yellow emphasis block"],
+    textSystem: {
+      role: "Bottom headline states the warning; yellow block carries the dangerous keyword.",
+      placement: "Bottom third, stacked with one yellow emphasized phrase.",
+      typography: "Extra-bold uppercase sans; white top line and black text on yellow block.",
+      maxWords: 6
+    },
+    visualRules: ["podcast proof", "symbolic center object", "warning contrast", "yellow keyword block", "faces looking engaged"],
+    promptRules: ["Use two people if available; otherwise use one host plus a symbolic object.", "Make the center object explain the threat.", "Keep the yellow block for the dangerous keyword only."],
+    negativeRules: ["Do not overcrowd with many icons.", "Do not turn it into a medical ad.", "Avoid tiny app labels."]
+  },
+  {
+    slug: "gaming-card",
+    title: "Gaming Card",
+    referenceImage: "brand/reference-styles/youtube/15-gaming-card.png",
+    useCases: ["gaming", "loot", "skins", "deals", "hidden item", "challenge"],
+    semanticMechanic: "A huge game card, shocked face, and arrow create instant curiosity around a valuable or surprising item.",
+    composition: {
+      layout: "Oversized rounded game card on left; shocked creator face fills right; giant arrow points to the card value.",
+      primarySubject: "Game item/card and exaggerated reaction face.",
+      supportingElements: ["bright cyan/green background", "large red arrow", "item price/value", "thick white card border"],
+      depth: "Card sits as a UI layer; face is a clean cutout on the right."
+    },
+    layers: ["bright gradient game background", "large item card", "price/value text", "red arrow", "shocked face cutout"],
+    textSystem: {
+      role: "The card label/value is the hook; extra headline is usually unnecessary.",
+      placement: "Inside the game card near lower-left; arrow points to the value.",
+      typography: "Bold game UI sans, white/yellow, large enough for mobile.",
+      maxWords: 4
+    },
+    visualRules: ["bright saturated colors", "large arrow", "oversized game card", "exaggerated emotion", "simple UI"],
+    promptRules: ["Make one game card the dominant object.", "Use one giant arrow pointing to the surprising value/item.", "Keep the reaction face large and clean."],
+    negativeRules: ["No tiny game UI clutter.", "Do not use multiple arrows.", "Avoid realistic muted colors."]
+  },
+  {
+    slug: "story-cards",
+    title: "Story Cards",
+    referenceImage: "brand/reference-styles/youtube/16-story-cards.png",
+    useCases: ["storytelling", "social media analysis", "viral breakdown", "creator strategy", "case studies"],
+    semanticMechanic: "Floating story cards around a serious face show multiple examples while the headline names the pattern.",
+    composition: {
+      layout: "Centered serious face with floating tilted content cards on both sides over a split color grid background.",
+      primarySubject: "Calm analyst face centered, often monochrome or muted.",
+      supportingElements: ["floating social/video cards", "view counts or tiny play markers", "teal/red split background", "large bottom headline"],
+      depth: "Cards float behind and around the face; headline anchors the bottom foreground."
+    },
+    layers: ["grid background split teal/red", "floating story cards", "central face", "bottom headline", "subtle glow/vignette"],
+    textSystem: {
+      role: "Headline names the viral pattern being explained.",
+      placement: "Large bottom text across the width.",
+      typography: "Bold uppercase white sans with subtle shadow.",
+      maxWords: 4
+    },
+    visualRules: ["central authority face", "floating proof cards", "split color tension", "bottom headline", "analysis mood"],
+    promptRules: ["Use 3-4 floating cards maximum.", "Make cards feel like examples, not the main text.", "Keep the central face calm and serious."],
+    negativeRules: ["Do not add too many cards.", "Avoid unreadable screenshots.", "Do not cover the eyes with cards."]
+  },
+  {
+    slug: "floating-proof",
+    title: "Floating Proof",
+    referenceImage: "brand/reference-styles/youtube/17-floating-proof.png",
+    useCases: ["income proof", "SaaS", "dashboard", "case study", "analytics", "business result"],
+    semanticMechanic: "A dashboard screenshot plus huge yellow metric banner makes the promised outcome feel concrete.",
+    composition: {
+      layout: "Large laptop/dashboard on left, presenter face on right, huge yellow metric banner across bottom.",
+      primarySubject: "Proof interface and presenter explaining it.",
+      supportingElements: ["dashboard/laptop screen", "curved arrow", "dark grid background", "oversized metric"],
+      depth: "Laptop and face are midground; yellow banner dominates foreground."
+    },
+    layers: ["dark grid background", "laptop/dashboard", "yellow arrow", "presenter face", "huge yellow metric banner"],
+    textSystem: {
+      role: "The metric is the click trigger and must be the largest element.",
+      placement: "Bottom banner across almost full width.",
+      typography: "Massive black bold sans on neon yellow banner.",
+      maxWords: 3
+    },
+    visualRules: ["giant metric", "proof screenshot", "neon yellow banner", "dark tech background", "direct eye contact"],
+    promptRules: ["Make the bottom metric banner dominate the thumbnail.", "Use one proof screen only.", "Add one arrow from presenter/proof to the key result."],
+    negativeRules: ["No dense dashboard details.", "No multiple competing numbers.", "Avoid small unreadable UI labels."]
+  },
+  {
+    slug: "educational",
+    title: "Educational",
+    referenceImage: "brand/reference-styles/youtube/18-educational.png",
+    useCases: ["education", "framework", "analytics", "creator advice", "market explanation"],
+    semanticMechanic: "A clean graph-board plus presenter pointing turns an abstract lesson into a simple visual framework.",
+    composition: {
+      layout: "White grid/graph board fills background; presenter cutout on right points to a simple chart and headline.",
+      primarySubject: "Presenter pointing at one chart or diagram.",
+      supportingElements: ["hand-drawn axis", "growth curve", "circled insight", "large concept title"],
+      depth: "Graph board is flat and clean; presenter overlaps it in foreground."
+    },
+    layers: ["white grid board", "hand-drawn axis", "simple curve", "circled insight", "large black title", "presenter pointing"],
+    textSystem: {
+      role: "Title names the concept; chart makes the lesson memorable.",
+      placement: "Large center-left title, chart marks around it.",
+      typography: "Bold black educational sans; optional hand-drawn labels.",
+      maxWords: 4
+    },
+    visualRules: ["clean white grid", "one simple chart", "one circled insight", "presenter pointing", "high readability"],
+    promptRules: ["Use exactly one simple graph or framework.", "Make the title readable at mobile size.", "Keep hand-drawn marks sparse and intentional."],
+    negativeRules: ["No dense infographic.", "No tiny handwriting.", "Do not add multiple charts."]
   }
 ];
 
