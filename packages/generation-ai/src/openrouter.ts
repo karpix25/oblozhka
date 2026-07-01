@@ -113,6 +113,7 @@ export class OpenRouterPromptPlanner {
   }
 
   private messages(input: PromptPlanningInput): OpenRouterMessage[] {
+    const templateGuide = this.templateGuide(input);
     const userContent: OpenRouterMessage["content"] = [
       {
         type: "text",
@@ -124,12 +125,16 @@ export class OpenRouterPromptPlanner {
           `Тема: ${input.wizard.topic}.`,
           `Ниша: ${input.wizard.niche}.`,
           `Стиль: ${input.wizard.style}.`,
+          templateGuide,
           `Текст на обложке: ${input.wizard.hookText || "без текста"}.`,
           input.wizard.guestReferenceImageUrl
             ? "Есть второй человек/гость. Используй его как отдельное лицо второго участника, особенно для podcast/podcast countdown композиций."
             : "Второго лица/гостя нет.",
+          "Сохрани композиционный скелет выбранного шаблона: расположение лица/объекта, зоны текста, крупность, глубину, направление взгляда/объекта, цветовую иерархию и характер шрифта.",
+          "Промпт должен явно описать layout zones, typography/font feel, text placement, subject/object placement, foreground/background depth, color accents.",
           "Не копируй чужой дизайн один-в-один. Бери только композицию, настроение, контраст и читаемость.",
-          "Промпт должен требовать крупный фокусный объект, чистую композицию, русский текст без ошибок, коммерческий thumbnail-look."
+          "Промпт должен требовать крупный фокусный объект, чистую композицию, русский текст без ошибок, коммерческий thumbnail-look.",
+          "Запрещено менять выбранный шаблон на другой формат композиции."
         ].join("\n")
       }
     ];
@@ -166,12 +171,19 @@ export class OpenRouterPromptPlanner {
     const faceRule = input.wizard.referenceMode === "FACE"
       ? "Use the uploaded face photo as identity reference; keep the person recognizable, flattering and expressive."
       : "Create an original thumbnail composition; do not copy any third-party design exactly.";
+    const templateRule = input.template?.promptRules
+      ? [
+          `Mandatory template: ${input.template.title ?? input.wizard.style}.`,
+          `Template rules: ${input.template.promptRules}.`,
+          "Preserve the template skeleton: text zones, font character, subject/object positions, scale, depth, color hierarchy and visual rhythm."
+        ].join(" ")
+      : `Style: ${input.wizard.style}.`;
 
     return {
       model: "fallback",
       prompt: [
         `Create a high-converting ${input.formatDescription} thumbnail, aspect ratio ${input.aspectRatio}.`,
-        `Topic: ${input.wizard.topic}. Niche: ${input.wizard.niche}. Style: ${input.wizard.style}.`,
+        `Topic: ${input.wizard.topic}. Niche: ${input.wizard.niche}. ${templateRule}`,
         faceRule,
         input.wizard.guestReferenceImageUrl ? "Use the second uploaded face as a separate guest/person in the composition." : "",
         input.wizard.hookText ? `Large readable Russian cover text: "${input.wizard.hookText}".` : "No unnecessary text.",
@@ -189,5 +201,18 @@ export class OpenRouterPromptPlanner {
       { text: "ВСЁ ИЗМЕНИЛОСЬ", angle: "turning point", score: 65 },
       { text: short.toUpperCase(), angle: "summary", score: 50 }
     ];
+  }
+
+  private templateGuide(input: PromptPlanningInput) {
+    const templateName = input.template?.title ?? input.wizard.style;
+    const templateSlug = input.template?.slug ?? input.wizard.templateSlug ?? "unknown";
+    const rules = input.template?.promptRules?.trim() || "No saved template rules. Infer from the selected style title.";
+
+    return [
+      `Выбранный шаблон: ${templateName}.`,
+      `Slug шаблона: ${templateSlug}.`,
+      `Обязательные правила шаблона:\n${rules}`,
+      "Эти правила важнее общих эстетических пожеланий."
+    ].join("\n");
   }
 }

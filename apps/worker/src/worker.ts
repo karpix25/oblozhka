@@ -57,7 +57,14 @@ new Worker<GenerationJobData, void, string>(
           style: generation.style
         },
         formatDescription: spec.description,
-        aspectRatio: spec.aspectRatio
+        aspectRatio: spec.aspectRatio,
+        template: generation.template
+          ? {
+              slug: generation.template.slug,
+              title: generation.template.title,
+              promptRules: generation.template.promptRules
+            }
+          : undefined
       });
       await updateGenerationPrompt(prisma, generation.id, {
         prompt: plan.prompt,

@@ -24,4 +24,9 @@ export type PromptPlanningInput = {
   wizard: WizardInput;
   formatDescription: string;
   aspectRatio: string;
+  template?: {
+    slug?: string | null;
+    title?: string | null;
+    promptRules?: string | null;
+  };
 };

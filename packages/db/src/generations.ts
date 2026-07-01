@@ -163,7 +163,7 @@ export async function markGenerationFailed(db: DbClient, id: string, errorMessag
 }
 
 export async function findGeneration(db: DbClient, id: string) {
-  return db.generation.findUnique({ where: { id }, include: { user: true, guestFaceAsset: true } });
+  return db.generation.findUnique({ where: { id }, include: { user: true, guestFaceAsset: true, template: true } });
 }
 
 export async function listGenerations(db: DbClient) {
