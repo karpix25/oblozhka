@@ -108,13 +108,28 @@ export class KieImageClient {
       return Buffer.from(value, "base64");
     }
     if (value.startsWith("http")) {
-      const image = await fetch(value);
-      if (!image.ok) {
-        throw new Error(`Failed to download Kie.ai image: ${image.status}`);
-      }
-      return Buffer.from(await image.arrayBuffer());
+      return this.downloadImage(value);
     }
     return undefined;
+  }
+
+  private async downloadImage(url: string): Promise<Buffer> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const image = await fetch(url);
+        if (!image.ok) {
+          throw new Error(`Failed to download Kie.ai image: ${image.status}`);
+        }
+        return Buffer.from(await image.arrayBuffer());
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
+        }
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("Failed to download Kie.ai image.");
   }
 
   private extractTaskId(response: KieResponse): string | undefined {
