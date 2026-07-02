@@ -1,4 +1,5 @@
 import { getFormatSpec, type WizardInput } from "@covers/domain";
+export { supportMessage } from "./compliance.js";
 
 export function startMessage(firstName?: string) {
   return [
@@ -58,10 +59,6 @@ export function referenceForGenerationPrompt() {
     "",
     "От него я возьму лицо, позу или композицию и соберу картинку в выбранном стиле."
   ].join("\n");
-}
-
-export function supportMessage() {
-  return "Поддержка: напишите владельцу проекта. Команда /paysupport доступна для вопросов по оплатам.";
 }
 
 export function termsMessage() {

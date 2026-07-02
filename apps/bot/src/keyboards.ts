@@ -11,6 +11,9 @@ export function mainKeyboard() {
     .text("📁 Мои проекты", "projects:mine")
     .text("💎 Баланс", "balance")
     .row()
+    .text("💳 Тарифы", "tariffs")
+    .text("📄 Документы", "documents")
+    .row()
     .text("❓ Как это работает", "how")
     .row()
     .text("💬 Поддержка", "support");

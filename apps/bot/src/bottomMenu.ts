@@ -1,8 +1,9 @@
 import { findUserByTelegramId, listTemplates, prisma } from "@covers/db";
 import { Keyboard } from "grammy";
+import { documentsKeyboard, documentsMessage, supportMessage, tariffsMessage } from "./compliance.js";
 import { openFaceLibrary } from "./faceLibrary.js";
 import { mainKeyboard, sourceTypeKeyboard } from "./keyboards.js";
-import { howItWorksMessage, sourceStartMessage, supportMessage } from "./messages.js";
+import { sourceStartMessage } from "./messages.js";
 import { sendProjectList } from "./projectList.js";
 import { resetWizard, type BotContext } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
@@ -12,6 +13,8 @@ const menuLabels = {
   templates: "🖼 Шаблоны",
   faces: "👤 Лица",
   projects: "📁 Проекты",
+  tariffs: "💳 Тарифы",
+  documents: "📄 Документы",
   balance: "💎 Баланс",
   help: "❓ Помощь"
 } as const;
@@ -23,6 +26,9 @@ export function bottomMenuKeyboard() {
     .row()
     .text(menuLabels.faces)
     .text(menuLabels.projects)
+    .row()
+    .text(menuLabels.tariffs)
+    .text(menuLabels.documents)
     .row()
     .text(menuLabels.balance)
     .text(menuLabels.help)
@@ -60,14 +66,23 @@ export async function handleBottomMenuText(ctx: BotContext) {
     return true;
   }
 
+  if (text === menuLabels.tariffs) {
+    await ctx.reply(tariffsMessage(), { reply_markup: mainKeyboard() });
+    return true;
+  }
+
+  if (text === menuLabels.documents) {
+    await ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() });
+    return true;
+  }
+
   if (text === menuLabels.balance) {
     const user = ctx.from ? await findUserByTelegramId(prisma, ctx.from.id) : null;
     await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: mainKeyboard() });
     return true;
   }
 
-  await ctx.reply(howItWorksMessage(), { reply_markup: mainKeyboard() });
-  await ctx.reply(supportMessage());
+  await ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() });
   return true;
 }
 

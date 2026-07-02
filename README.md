@@ -62,6 +62,9 @@ cp .env.docker.example .env.docker
 
 ```bash
 BOT_TOKEN=""
+SUPPORT_CONTACT="@karlo25"
+PRIVACY_POLICY_URL="https://telegra.ph/Politika-konfidencialnosti-06-21-31"
+USER_AGREEMENT_URL="https://telegra.ph/Polzovatelskoe-soglashenie-04-01-19"
 KIE_API_KEY=""
 OPENROUTER_API_KEY=""
 SCRAPECREATORS_API_KEY=""

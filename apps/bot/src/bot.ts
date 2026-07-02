@@ -18,6 +18,7 @@ import {
 import { Bot, session } from "grammy";
 import { randomUUID } from "node:crypto";
 import { handleBottomMenuText, showBottomMenu } from "./bottomMenu.js";
+import { documentsKeyboard, documentsMessage, tariffsMessage } from "./compliance.js";
 import {
   confirmKeyboard,
   formatKeyboard,
@@ -59,9 +60,13 @@ bot.command("start", async (ctx) => {
   await showBottomMenu(ctx);
 });
 
-bot.command("terms", async (ctx) => ctx.reply(termsMessage()));
-bot.command("support", async (ctx) => ctx.reply(supportMessage()));
-bot.command("paysupport", async (ctx) => ctx.reply(supportMessage()));
+bot.command("terms", async (ctx) => ctx.reply(termsMessage(), { reply_markup: documentsKeyboard() }));
+bot.command("docs", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
+bot.command("privacy", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
+bot.command("agreement", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
+bot.command("tariffs", async (ctx) => ctx.reply(tariffsMessage(), { reply_markup: mainKeyboard() }));
+bot.command("support", async (ctx) => ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() }));
+bot.command("paysupport", async (ctx) => ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() }));
 
 bot.callbackQuery("balance", async (ctx) => {
   const user = await findUserByTelegramId(prisma, ctx.from.id);
@@ -73,7 +78,7 @@ bot.callbackQuery("balance", async (ctx) => {
 bot.callbackQuery("support", async (ctx) => {
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply(supportMessage());
+  await ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() });
 });
 
 bot.callbackQuery("home", async (ctx) => {
@@ -87,6 +92,18 @@ bot.callbackQuery("how", async (ctx) => {
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
   await ctx.reply(howItWorksMessage(), { reply_markup: mainKeyboard() });
+});
+
+bot.callbackQuery("documents", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
+  await ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() });
+});
+
+bot.callbackQuery("tariffs", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
+  await ctx.reply(tariffsMessage(), { reply_markup: mainKeyboard() });
 });
 
 bot.callbackQuery("packages", async (ctx) => {
