@@ -17,7 +17,7 @@ import {
 } from "@covers/telegram-payments";
 import { Bot, session } from "grammy";
 import { randomUUID } from "node:crypto";
-import { handleBottomMenuText, showBottomMenu } from "./bottomMenu.js";
+import { bottomMenuKeyboard, handleBottomMenuText } from "./bottomMenu.js";
 import { documentsKeyboard, documentsMessage, tariffsMessage } from "./compliance.js";
 import {
   confirmKeyboard,
@@ -56,8 +56,13 @@ registerProjectHandlers(bot, token);
 
 bot.command("start", async (ctx) => {
   await upsertTelegramUser(prisma, profileFromContext(ctx));
-  await sendOnboarding(ctx, ctx.from?.first_name);
-  await showBottomMenu(ctx);
+  ctx.session.bottomMenuVisible = true;
+  await sendOnboarding(ctx, ctx.from?.first_name, "bottom");
+});
+
+bot.command("menu", async (ctx) => {
+  ctx.session.bottomMenuVisible = true;
+  await ctx.reply("Нижняя панель включена.", { reply_markup: bottomMenuKeyboard() });
 });
 
 bot.command("terms", async (ctx) => ctx.reply(termsMessage(), { reply_markup: documentsKeyboard() }));
@@ -85,7 +90,14 @@ bot.callbackQuery("home", async (ctx) => {
   resetWizard(ctx);
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await sendOnboarding(ctx, ctx.from.first_name);
+  await sendOnboarding(ctx, ctx.from.first_name, ctx.session.bottomMenuVisible ? "bottom" : "inline");
+});
+
+bot.callbackQuery("menu:show", async (ctx) => {
+  ctx.session.bottomMenuVisible = true;
+  await ctx.answerCallbackQuery();
+  await deleteCallbackMessage(ctx);
+  await ctx.reply("Нижняя панель включена.", { reply_markup: bottomMenuKeyboard() });
 });
 
 bot.callbackQuery("how", async (ctx) => {
