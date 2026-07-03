@@ -7,7 +7,6 @@ export type BotSession = {
   step: WizardStep;
   projectId?: string;
   templateGalleryMode?: "browse" | "select";
-  bottomMenuVisible?: boolean;
   draft?: Partial<WizardInput>;
 };
 

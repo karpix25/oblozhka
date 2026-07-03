@@ -1,5 +1,5 @@
 import { findUserByTelegramId, listTemplates, prisma } from "@covers/db";
-import { InlineKeyboard, Keyboard } from "grammy";
+import { Keyboard } from "grammy";
 import { documentsKeyboard, documentsMessage, supportMessage, tariffsMessage } from "./compliance.js";
 import { openFaceLibrary } from "./faceLibrary.js";
 import { mainKeyboard, sourceTypeKeyboard } from "./keyboards.js";
@@ -16,8 +16,7 @@ const menuLabels = {
   tariffs: "💳 Тарифы",
   documents: "📄 Документы",
   balance: "💎 Баланс",
-  help: "❓ Помощь",
-  hide: "🙈 Скрыть меню"
+  help: "❓ Помощь"
 } as const;
 
 export function bottomMenuKeyboard() {
@@ -33,15 +32,9 @@ export function bottomMenuKeyboard() {
     .row()
     .text(menuLabels.balance)
     .text(menuLabels.help)
-    .row()
-    .text(menuLabels.hide)
     .resized()
     .persistent()
     .placeholder("Выберите действие");
-}
-
-export function showMenuKeyboard() {
-  return new InlineKeyboard().text("📌 Показать нижнее меню", "menu:show").row().text("🏠 В начало", "home");
 }
 
 export async function handleBottomMenuText(ctx: BotContext) {
@@ -89,15 +82,10 @@ export async function handleBottomMenuText(ctx: BotContext) {
     return true;
   }
 
-  if (text === menuLabels.hide) {
-    ctx.session.bottomMenuVisible = false;
-    await ctx.reply("Нижняя панель скрыта. Вернуть её можно кнопкой ниже или командой /menu.", {
-      reply_markup: { remove_keyboard: true }
-    });
-    await ctx.reply("Быстрое меню:", { reply_markup: showMenuKeyboard() });
-    return true;
-  }
-
   await ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() });
   return true;
+}
+
+export async function showBottomMenu(ctx: BotContext) {
+  await ctx.reply("Быстрое меню включено снизу.", { reply_markup: bottomMenuKeyboard() });
 }
