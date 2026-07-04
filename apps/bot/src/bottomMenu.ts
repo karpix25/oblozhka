@@ -1,6 +1,6 @@
 import { findUserByTelegramId, listTemplates, prisma } from "@covers/db";
 import { Keyboard } from "grammy";
-import { documentsKeyboard, documentsMessage, supportMessage, tariffsMessage } from "./compliance.js";
+import { documentsKeyboard, supportMessage, tariffsMessage } from "./compliance.js";
 import { openFaceLibrary } from "./faceLibrary.js";
 import { sourceTypeKeyboard } from "./keyboards.js";
 import { sourceStartMessage } from "./messages.js";
@@ -15,7 +15,6 @@ const menuLabels = {
   faces: "👤 Лица",
   projects: "📁 Проекты",
   tariffs: "💳 Тарифы",
-  documents: "📄 Документы",
   balance: "💎 Баланс",
   help: "❓ Помощь"
 } as const;
@@ -29,9 +28,8 @@ export function bottomMenuKeyboard() {
     .text(menuLabels.projects)
     .row()
     .text(menuLabels.tariffs)
-    .text(menuLabels.documents)
-    .row()
     .text(menuLabels.balance)
+    .row()
     .text(menuLabels.help)
     .resized()
     .persistent()
@@ -69,11 +67,6 @@ export async function handleBottomMenuText(ctx: BotContext) {
 
   if (text === menuLabels.tariffs) {
     await ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() });
-    return true;
-  }
-
-  if (text === menuLabels.documents) {
-    await ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() });
     return true;
   }
 
