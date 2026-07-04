@@ -63,7 +63,9 @@ export function formatKeyboard() {
   return new InlineKeyboard()
     .text(FORMAT_SPECS.YOUTUBE.label, "format:YOUTUBE")
     .row()
-    .text(FORMAT_SPECS.VERTICAL.label, "format:VERTICAL");
+    .text(FORMAT_SPECS.VERTICAL.label, "format:VERTICAL")
+    .row()
+    .text("🏠 В начало", "home");
 }
 
 export function nicheKeyboard() {
@@ -74,6 +76,7 @@ export function nicheKeyboard() {
       keyboard.row();
     }
   });
+  keyboard.row().text("🏠 В начало", "home");
   return keyboard;
 }
 
@@ -85,6 +88,7 @@ export function styleKeyboard() {
       keyboard.row();
     }
   });
+  keyboard.row().text("🏠 В начало", "home");
   return keyboard;
 }
 

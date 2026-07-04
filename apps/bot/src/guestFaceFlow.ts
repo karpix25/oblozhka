@@ -9,6 +9,7 @@ import {
 } from "@covers/db";
 import { InlineKeyboard } from "grammy";
 import type { BotContext } from "./session.js";
+import { backHomeKeyboard } from "./sectionKeyboards.js";
 import { profileFromContext } from "./userProfile.js";
 
 export function requiresGuestFace(template?: { slug?: string | null } | null) {
@@ -54,7 +55,9 @@ export async function saveUploadedGuestFace(ctx: BotContext, token: string) {
 
   const file = await ctx.api.getFile(photo.file_id);
   if (!file.file_path) {
-    await ctx.reply("Не получилось прочитать фото второго человека. Попробуйте другое изображение.");
+    await ctx.reply("Не получилось прочитать фото второго человека. Попробуйте другое изображение.", {
+      reply_markup: backHomeKeyboard()
+    });
     return true;
   }
 

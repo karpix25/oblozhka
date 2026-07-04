@@ -1,5 +1,4 @@
 import { findUserByTelegramId, listTemplates, prisma } from "@covers/db";
-import { Keyboard } from "grammy";
 import { documentsKeyboard, supportMessage, tariffsMessage } from "./compliance.js";
 import { openFaceLibrary } from "./faceLibrary.js";
 import { sourceTypeKeyboard } from "./keyboards.js";
@@ -9,77 +8,65 @@ import { balanceKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
 import { resetWizard, type BotContext } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 
-const menuLabels = {
+const legacyMenuLabels = {
   create: "🎨 Создать",
   templates: "🖼 Шаблоны",
   faces: "👤 Лица",
   projects: "📁 Проекты",
   tariffs: "💳 Тарифы",
+  documents: "📄 Документы",
   balance: "💎 Баланс",
   help: "❓ Помощь"
 } as const;
 
-export function bottomMenuKeyboard() {
-  return new Keyboard()
-    .text(menuLabels.create)
-    .text(menuLabels.templates)
-    .row()
-    .text(menuLabels.faces)
-    .text(menuLabels.projects)
-    .row()
-    .text(menuLabels.tariffs)
-    .text(menuLabels.balance)
-    .row()
-    .text(menuLabels.help)
-    .resized()
-    .persistent()
-    .placeholder("Выберите действие");
+const removeReplyKeyboard = { remove_keyboard: true } as const;
+
+export async function hideReplyMenu(ctx: BotContext) {
+  await ctx.reply("Убрал нижнее меню. Теперь все действия — в кнопках под сообщениями.", {
+    reply_markup: removeReplyKeyboard
+  });
 }
 
-export async function handleBottomMenuText(ctx: BotContext) {
+export async function handleLegacyReplyMenuText(ctx: BotContext) {
   const text = ctx.message?.text?.trim();
-  if (!text || !(Object.values(menuLabels) as string[]).includes(text)) {
+  if (!text || !(Object.values(legacyMenuLabels) as string[]).includes(text)) {
     return false;
   }
 
-  if (text === menuLabels.create) {
+  if (text === legacyMenuLabels.create) {
     resetWizard(ctx);
     await ctx.reply(sourceStartMessage(), { reply_markup: sourceTypeKeyboard() });
     return true;
   }
 
-  if (text === menuLabels.templates) {
+  if (text === legacyMenuLabels.templates) {
     ctx.session.templateGalleryMode = "browse";
     const templates = await listTemplates(prisma, "YOUTUBE");
     await sendTemplateGallery(ctx, templates, { mode: "browse", platform: "YOUTUBE" });
     return true;
   }
 
-  if (text === menuLabels.faces) {
+  if (text === legacyMenuLabels.faces) {
     await openFaceLibrary(ctx);
     return true;
   }
 
-  if (text === menuLabels.projects) {
+  if (text === legacyMenuLabels.projects) {
     await sendProjectList(ctx);
     return true;
   }
 
-  if (text === menuLabels.tariffs) {
+  if (text === legacyMenuLabels.tariffs) {
     await ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() });
     return true;
   }
 
-  if (text === menuLabels.balance) {
-    const user = ctx.from ? await findUserByTelegramId(prisma, ctx.from.id) : null;
-    await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: balanceKeyboard() });
+  if (text === legacyMenuLabels.documents || text === legacyMenuLabels.help) {
+    await ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() });
     return true;
   }
 
-  await ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() });
+  const user = ctx.from ? await findUserByTelegramId(prisma, ctx.from.id) : null;
+  await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: balanceKeyboard() });
   return true;
-}
-
-export async function showBottomMenu(ctx: BotContext) {
-  await ctx.reply("Быстрое меню включено снизу.", { reply_markup: bottomMenuKeyboard() });
 }

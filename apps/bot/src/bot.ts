@@ -17,7 +17,7 @@ import {
 } from "@covers/telegram-payments";
 import { Bot, session } from "grammy";
 import { randomUUID } from "node:crypto";
-import { handleBottomMenuText, showBottomMenu } from "./bottomMenu.js";
+import { handleLegacyReplyMenuText, hideReplyMenu } from "./legacyReplyMenu.js";
 import { documentsKeyboard, documentsMessage, tariffsMessage } from "./compliance.js";
 import {
   confirmKeyboard,
@@ -56,8 +56,8 @@ registerProjectHandlers(bot, token);
 
 bot.command("start", async (ctx) => {
   await upsertTelegramUser(prisma, profileFromContext(ctx));
+  await hideReplyMenu(ctx);
   await sendOnboarding(ctx, ctx.from?.first_name);
-  await showBottomMenu(ctx);
 });
 
 bot.command("terms", async (ctx) => ctx.reply(termsMessage(), { reply_markup: documentsKeyboard() }));
@@ -199,7 +199,7 @@ bot.callbackQuery(/^refmode:(FACE|REFERENCE|NONE)$/, async (ctx) => {
   }
 
   ctx.session.step = "referenceUpload";
-  await ctx.reply(referencePrompt(referenceMode));
+  await ctx.reply(referencePrompt(referenceMode), { reply_markup: backHomeKeyboard() });
 });
 
 bot.callbackQuery(/^format:(YOUTUBE|VERTICAL)$/, async (ctx) => {
@@ -207,7 +207,7 @@ bot.callbackQuery(/^format:(YOUTUBE|VERTICAL)$/, async (ctx) => {
   ctx.session.step = "topic";
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply(topicPrompt());
+  await ctx.reply(topicPrompt(), { reply_markup: backHomeKeyboard() });
 });
 
 bot.callbackQuery(/^niche:(.+)$/, async (ctx) => {
@@ -222,7 +222,7 @@ bot.callbackQuery(/^style:(.+)$/, async (ctx) => {
   ctx.session.step = "hook";
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply(hookPrompt());
+  await ctx.reply(hookPrompt(), { reply_markup: backHomeKeyboard() });
 });
 
 bot.on("message:photo", async (ctx) => {
@@ -256,13 +256,15 @@ bot.on("message:photo", async (ctx) => {
 });
 
 bot.on("message:text", async (ctx) => {
-  if (await handleBottomMenuText(ctx)) return;
+  if (await handleLegacyReplyMenuText(ctx)) return;
   if (await handleProjectText(ctx)) return;
 
   if (ctx.session.step === "topic") {
     const topic = ctx.message.text.trim();
     if (topic.length < 5) {
-      await ctx.reply("Тема слишком короткая. Напишите чуть конкретнее: о чём ролик и в чём интрига?");
+      await ctx.reply("Тема слишком короткая. Напишите чуть конкретнее: о чём ролик и в чём интрига?", {
+        reply_markup: backHomeKeyboard()
+      });
       return;
     }
     ctx.session.draft = { ...ctx.session.draft, topic };
@@ -325,7 +327,7 @@ async function askFormatOrTopic(ctx: BotContext) {
     return;
   }
   ctx.session.step = "topic";
-  await ctx.reply(topicPrompt());
+  await ctx.reply(topicPrompt(), { reply_markup: backHomeKeyboard() });
 }
 
 bot.start();

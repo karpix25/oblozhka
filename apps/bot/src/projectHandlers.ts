@@ -24,7 +24,7 @@ import { deleteCallbackMessage } from "./navigation.js";
 import { sendProjectList } from "./projectList.js";
 import { generationJobId, generationQueue, hookJobId, hookQueue } from "./queue.js";
 import { askReferenceForGeneration, saveUploadedReferenceFace, useSavedReferenceFace } from "./referenceFaceFlow.js";
-import { projectsKeyboard } from "./sectionKeyboards.js";
+import { backHomeKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, resetWizard } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
@@ -76,7 +76,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     ctx.session.step = sourceType === "LINK" ? "sourceLink" : sourceType === "VIDEO" ? "sourceVideo" : "sourceTranscript";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(sourcePrompt(sourceType));
+    await ctx.reply(sourcePrompt(sourceType), { reply_markup: backHomeKeyboard() });
   });
 
   bot.callbackQuery(/^platform:(YOUTUBE|INSTAGRAM_TIKTOK|FACELESS)$/, async (ctx) => {
@@ -120,7 +120,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     ctx.session.step = "guestFaceUpload";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply("Загрузите фото второго человека для podcast countdown.");
+    await ctx.reply("Загрузите фото второго человека для podcast countdown.", { reply_markup: backHomeKeyboard() });
   });
 
   async function enqueueHooks(ctx: BotContext) {
@@ -163,7 +163,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     ctx.session.step = "referenceUpload";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(referenceForGenerationPrompt());
+    await ctx.reply(referenceForGenerationPrompt(), { reply_markup: backHomeKeyboard() });
   });
 
   bot.on("message:video", async (ctx) => {
@@ -187,7 +187,9 @@ export async function handleProjectText(ctx: BotContext) {
   if (ctx.session.step === "sourceLink") {
     const url = ctx.message?.text?.trim() ?? "";
     if (!url.startsWith("http")) {
-      await ctx.reply("Похоже, это не ссылка. Отправьте URL, который начинается с http или https.");
+      await ctx.reply("Похоже, это не ссылка. Отправьте URL, который начинается с http или https.", {
+        reply_markup: backHomeKeyboard()
+      });
       return true;
     }
     await createProjectFromSource(ctx, "LINK", { url });
@@ -197,7 +199,9 @@ export async function handleProjectText(ctx: BotContext) {
   if (ctx.session.step === "sourceTranscript") {
     const text = ctx.message?.text?.trim() ?? "";
     if (text.length < 80) {
-      await ctx.reply("Текст слишком короткий. Вставьте хотя бы несколько абзацев, чтобы я понял смысл ролика.");
+      await ctx.reply("Текст слишком короткий. Вставьте хотя бы несколько абзацев, чтобы я понял смысл ролика.", {
+        reply_markup: backHomeKeyboard()
+      });
       return true;
     }
     await createProjectFromSource(ctx, "TRANSCRIPT", { text });
@@ -225,7 +229,9 @@ export async function handleProjectPhoto(ctx: BotContext, token: string) {
 
   const file = await ctx.api.getFile(photo.file_id);
   if (!file.file_path) {
-    await ctx.reply("Не получилось прочитать фото. Попробуйте отправить изображение ещё раз.");
+    await ctx.reply("Не получилось прочитать фото. Попробуйте отправить изображение ещё раз.", {
+      reply_markup: backHomeKeyboard()
+    });
     return true;
   }
 
