@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="400" viewBox="0 0 1220 400">
+  <rect x="14" y="14" width="1192" height="372" rx="8" fill="#ffffff" stroke="#9ca3af" stroke-width="2" stroke-dasharray="6 8"/>
+  <g transform="translate(68 82)" fill="none" stroke="#d1d5db" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="50" height="44" rx="2"/>
+    <path d="M8 35l13-14 10 8 9-12 10 18"/>
+    <circle cx="17" cy="14" r="5"/>
+    <path d="M54 24v28M40 38h28"/>
+  </g>
+  <text x="144" y="120" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" fill="#202124">Загрузите фото лица</text>
+  <text x="144" y="168" font-family="Inter, Arial, sans-serif" font-size="30" fill="#8a8d96">✓  Лицо анфас</text>
+  <text x="144" y="216" font-family="Inter, Arial, sans-serif" font-size="30" fill="#8a8d96">✓  Хороший свет, лицо видно</text>
+  <text x="144" y="264" font-family="Inter, Arial, sans-serif" font-size="30" fill="#8a8d96">✓  Файл до 10 МБ</text>
+  <text x="144" y="314" font-family="Inter, Arial, sans-serif" font-size="30" fill="#ef4444">×</text>
+  <text x="184" y="314" font-family="Inter, Arial, sans-serif" font-size="30" fill="#8a8d96">Не используйте публичных людей</text>
+
+  <g transform="translate(655 62)">
+    <rect x="0" y="0" width="245" height="112" rx="6" fill="#f5d0a5" stroke="#22c55e" stroke-width="4"/>
+    <circle cx="74" cy="46" r="28" fill="#2f2f2f"/>
+    <circle cx="74" cy="76" r="34" fill="#f7c79f"/>
+    <rect x="30" y="84" width="88" height="28" rx="14" fill="#ffffff"/>
+    <circle cx="205" cy="72" r="20" fill="#22c55e"/>
+    <path d="M195 72l8 8 15-18" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="128" y="63" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#111827">Подходит</text>
+  </g>
+
+  <g transform="translate(923 62)">
+    <rect x="0" y="0" width="245" height="112" rx="6" fill="#261b1b" stroke="#ef4444" stroke-width="4"/>
+    <circle cx="78" cy="54" r="32" fill="#0f172a"/>
+    <path d="M0 0h245v112H0z" fill="#000000" opacity="0.34"/>
+    <circle cx="205" cy="72" r="20" fill="#ef4444"/>
+    <path d="M197 64l16 16M213 64l-16 16" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+    <text x="128" y="63" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Темно</text>
+  </g>
+
+  <g transform="translate(655 222)">
+    <rect x="0" y="0" width="245" height="112" rx="6" fill="#eef2f7" stroke="#ef4444" stroke-width="4"/>
+    <circle cx="78" cy="43" r="34" fill="#f0b690"/>
+    <path d="M43 112c8-34 26-50 36-50 12 0 30 16 39 50" fill="#1f2937"/>
+    <text x="116" y="48" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700" fill="#111827">Не публичное</text>
+    <text x="116" y="75" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700" fill="#111827">лицо</text>
+    <circle cx="205" cy="72" r="20" fill="#ef4444"/>
+    <path d="M197 64l16 16M213 64l-16 16" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(923 222)">
+    <rect x="0" y="0" width="245" height="112" rx="6" fill="#d7c0a2" stroke="#ef4444" stroke-width="4"/>
+    <rect x="0" y="0" width="245" height="112" fill="#000000" opacity="0.08"/>
+    <circle cx="83" cy="54" r="32" fill="#f2c09a"/>
+    <path d="M74 24c33 4 51 27 48 70-18-18-36-21-65-21-14-20-11-38 17-49z" fill="#344054"/>
+    <text x="124" y="63" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#111827">Сбоку</text>
+    <circle cx="205" cy="72" r="20" fill="#ef4444"/>
+    <path d="M197 64l16 16M213 64l-16 16" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>

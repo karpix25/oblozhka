@@ -1,7 +1,7 @@
 import { templateDisplayName, type ProjectPlatform } from "@covers/domain";
 import { InlineKeyboard, InputFile, InputMediaBuilder } from "grammy";
 import { templatePreviewPath } from "./assets.js";
-import { mainKeyboard } from "./keyboards.js";
+import { backHomeKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 
 type GalleryMode = "browse" | "select";
@@ -27,7 +27,7 @@ export async function sendTemplateGallery(
   input: { mode: GalleryMode; platform: ProjectPlatform; page?: number; replace?: boolean }
 ) {
   if (templates.length === 0) {
-    await ctx.reply("Для этой платформы шаблоны пока не настроены.", { reply_markup: mainKeyboard() });
+    await ctx.reply("Для этой платформы шаблоны пока не настроены.", { reply_markup: backHomeKeyboard() });
     return;
   }
 

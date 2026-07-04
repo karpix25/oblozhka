@@ -2,9 +2,10 @@ import { findUserByTelegramId, listTemplates, prisma } from "@covers/db";
 import { Keyboard } from "grammy";
 import { documentsKeyboard, documentsMessage, supportMessage, tariffsMessage } from "./compliance.js";
 import { openFaceLibrary } from "./faceLibrary.js";
-import { mainKeyboard, sourceTypeKeyboard } from "./keyboards.js";
+import { sourceTypeKeyboard } from "./keyboards.js";
 import { sourceStartMessage } from "./messages.js";
 import { sendProjectList } from "./projectList.js";
+import { balanceKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
 import { resetWizard, type BotContext } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 
@@ -67,7 +68,7 @@ export async function handleBottomMenuText(ctx: BotContext) {
   }
 
   if (text === menuLabels.tariffs) {
-    await ctx.reply(tariffsMessage(), { reply_markup: mainKeyboard() });
+    await ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() });
     return true;
   }
 
@@ -78,7 +79,7 @@ export async function handleBottomMenuText(ctx: BotContext) {
 
   if (text === menuLabels.balance) {
     const user = ctx.from ? await findUserByTelegramId(prisma, ctx.from.id) : null;
-    await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: mainKeyboard() });
+    await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: balanceKeyboard() });
     return true;
   }
 

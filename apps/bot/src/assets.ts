@@ -8,6 +8,10 @@ export function onboardingImagePath() {
   return join(assetRoot, "onboarding.png");
 }
 
+export function faceUploadGuidePath() {
+  return join(assetRoot, "face-upload-guide.png");
+}
+
 export function templatePreviewPath(slug: string) {
   return join(assetRoot, "templates", `${slug}.png`);
 }

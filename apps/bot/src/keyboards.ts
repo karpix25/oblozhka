@@ -103,5 +103,6 @@ export function packagesKeyboard(packages: Array<{ id: string; title: string; st
   packages.forEach((pack) => {
     keyboard.text(`${pack.title}: ${pack.credits} обложек за ${pack.starsPrice} ⭐`, `buy:${pack.id}`).row();
   });
+  keyboard.text("⬅️ Назад", "tariffs").text("🏠 В начало", "home");
   return keyboard;
 }

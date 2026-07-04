@@ -22,7 +22,6 @@ import { documentsKeyboard, documentsMessage, tariffsMessage } from "./complianc
 import {
   confirmKeyboard,
   formatKeyboard,
-  mainKeyboard,
   nicheKeyboard,
   packagesKeyboard,
   referenceModeKeyboard,
@@ -41,6 +40,7 @@ import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
 import { generationJobId, generationQueue } from "./queue.js";
+import { balanceKeyboard, backHomeKeyboard, projectsKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
 import { profileFromContext } from "./userProfile.js";
 
@@ -64,7 +64,7 @@ bot.command("terms", async (ctx) => ctx.reply(termsMessage(), { reply_markup: do
 bot.command("docs", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
 bot.command("privacy", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
 bot.command("agreement", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
-bot.command("tariffs", async (ctx) => ctx.reply(tariffsMessage(), { reply_markup: mainKeyboard() }));
+bot.command("tariffs", async (ctx) => ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() }));
 bot.command("support", async (ctx) => ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() }));
 bot.command("paysupport", async (ctx) => ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() }));
 
@@ -72,7 +72,7 @@ bot.callbackQuery("balance", async (ctx) => {
   const user = await findUserByTelegramId(prisma, ctx.from.id);
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`);
+  await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: balanceKeyboard() });
 });
 
 bot.callbackQuery("support", async (ctx) => {
@@ -91,7 +91,7 @@ bot.callbackQuery("home", async (ctx) => {
 bot.callbackQuery("how", async (ctx) => {
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply(howItWorksMessage(), { reply_markup: mainKeyboard() });
+  await ctx.reply(howItWorksMessage(), { reply_markup: backHomeKeyboard() });
 });
 
 bot.callbackQuery("documents", async (ctx) => {
@@ -103,7 +103,7 @@ bot.callbackQuery("documents", async (ctx) => {
 bot.callbackQuery("tariffs", async (ctx) => {
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
-  await ctx.reply(tariffsMessage(), { reply_markup: mainKeyboard() });
+  await ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() });
 });
 
 bot.callbackQuery("packages", async (ctx) => {
@@ -111,7 +111,7 @@ bot.callbackQuery("packages", async (ctx) => {
   await ctx.answerCallbackQuery();
   await deleteCallbackMessage(ctx);
   if (packages.length === 0) {
-    await ctx.reply("Пакеты обложек пока не настроены.");
+    await ctx.reply("Пакеты обложек пока не настроены.", { reply_markup: backHomeKeyboard("tariffs") });
     return;
   }
   await ctx.reply("Выберите пакет:", { reply_markup: packagesKeyboard(packages) });
@@ -230,7 +230,7 @@ bot.on("message:photo", async (ctx) => {
 
   if (ctx.session.step !== "referenceUpload") {
     await ctx.reply("Фото получил. Чтобы использовать его для обложки, нажмите «Создать обложку».", {
-      reply_markup: mainKeyboard()
+      reply_markup: projectsKeyboard()
     });
     return;
   }
@@ -276,7 +276,7 @@ bot.on("message:text", async (ctx) => {
     const draft = { ...ctx.session.draft, hookText };
     if (!isWizardInput(draft)) {
       resetWizard(ctx);
-      await ctx.reply("Не хватило данных. Начните заново.", { reply_markup: mainKeyboard() });
+      await ctx.reply("Не хватило данных. Начните заново.", { reply_markup: backHomeKeyboard() });
       return;
     }
     ctx.session.draft = draft;

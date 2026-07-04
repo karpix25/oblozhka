@@ -12,7 +12,7 @@ import {
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
 import { openFaceLibrary } from "./faceLibrary.js";
-import { mainKeyboard, platformKeyboard, sourceTypeKeyboard } from "./keyboards.js";
+import { platformKeyboard, sourceTypeKeyboard } from "./keyboards.js";
 import { askGuestFace, requiresGuestFace, saveUploadedGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
 import {
   platformPrompt,
@@ -24,6 +24,7 @@ import { deleteCallbackMessage } from "./navigation.js";
 import { sendProjectList } from "./projectList.js";
 import { generationJobId, generationQueue, hookJobId, hookQueue } from "./queue.js";
 import { askReferenceForGeneration, saveUploadedReferenceFace, useSavedReferenceFace } from "./referenceFaceFlow.js";
+import { projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, resetWizard } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
@@ -168,7 +169,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
   bot.on("message:video", async (ctx) => {
     if (ctx.session.step !== "sourceVideo") {
       await ctx.reply("Видео получил. Чтобы использовать его для обложки, нажмите «Создать обложку» → «Загрузить видео».", {
-        reply_markup: mainKeyboard()
+        reply_markup: projectsKeyboard()
       });
       return;
     }
