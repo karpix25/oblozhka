@@ -1,4 +1,5 @@
-import { findUserByTelegramId, listTemplates, prisma } from "@covers/db";
+import { getBillingAccess, listTemplates, prisma, upsertTelegramUser } from "@covers/db";
+import { balanceMessage } from "./billingMessages.js";
 import { documentsKeyboard, supportMessage, tariffsMessage } from "./compliance.js";
 import { openFaceLibrary } from "./faceLibrary.js";
 import { sourceTypeKeyboard } from "./keyboards.js";
@@ -7,6 +8,7 @@ import { sendProjectList } from "./projectList.js";
 import { balanceKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
 import { resetWizard, type BotContext } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
+import { profileFromContext } from "./userProfile.js";
 
 const legacyMenuLabels = {
   create: "🎨 Создать",
@@ -67,7 +69,8 @@ export async function handleLegacyReplyMenuText(ctx: BotContext) {
     return true;
   }
 
-  const user = ctx.from ? await findUserByTelegramId(prisma, ctx.from.id) : null;
-  await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: balanceKeyboard() });
+  const user = ctx.from ? await upsertTelegramUser(prisma, profileFromContext(ctx)) : null;
+  const access = user ? await getBillingAccess(prisma, user.id) : null;
+  await ctx.reply(access ? balanceMessage(access) : "Не получилось прочитать баланс.", { reply_markup: balanceKeyboard() });
   return true;
 }

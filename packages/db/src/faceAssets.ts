@@ -23,6 +23,10 @@ export async function listUserFaceAssets(db: DbClient, userId: string, take = 6)
   });
 }
 
+export async function countUserFaceAssets(db: DbClient, userId: string) {
+  return db.userFaceAsset.count({ where: { userId } });
+}
+
 export async function findUserFaceAsset(db: DbClient, id: string, userId: string) {
   return db.userFaceAsset.findFirst({ where: { id, userId } });
 }

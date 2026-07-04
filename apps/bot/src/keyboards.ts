@@ -99,12 +99,3 @@ export function confirmKeyboard() {
     .text("🔄 Начать заново", "project:start")
     .text("🏠 В начало", "home");
 }
-
-export function packagesKeyboard(packages: Array<{ id: string; title: string; starsPrice: number; credits: number }>) {
-  const keyboard = new InlineKeyboard();
-  packages.forEach((pack) => {
-    keyboard.text(`${pack.title}: ${pack.credits} обложек за ${pack.starsPrice} ⭐`, `buy:${pack.id}`).row();
-  });
-  keyboard.text("⬅️ Назад", "tariffs").text("🏠 В начало", "home");
-  return keyboard;
-}

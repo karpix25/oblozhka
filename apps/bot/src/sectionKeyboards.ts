@@ -9,7 +9,7 @@ export function balanceKeyboard() {
 }
 
 export function tariffsKeyboard() {
-  return new InlineKeyboard().text("⭐ Выбрать пакет", "packages").row().text("⬅️ Назад", "home").text("🏠 В начало", "home");
+  return new InlineKeyboard().text("⭐ Выбрать тариф", "packages").row().text("⬅️ Назад", "home").text("🏠 В начало", "home");
 }
 
 export function facesKeyboard() {

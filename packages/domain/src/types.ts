@@ -1,3 +1,5 @@
+import type { PaidPlan } from "./plans.js";
+
 export type CoverFormat = "YOUTUBE" | "VERTICAL";
 
 export type ReferenceMode = "FACE" | "REFERENCE" | "NONE";
@@ -32,9 +34,11 @@ export type UserProfile = {
 
 export type CreditPackageInput = {
   title: string;
+  slug?: string;
   description?: string;
   starsPrice: number;
   credits: number;
+  plan?: PaidPlan;
   isActive?: boolean;
 };
 

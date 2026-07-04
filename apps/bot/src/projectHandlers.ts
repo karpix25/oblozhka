@@ -1,6 +1,6 @@
 import {
-  createGenerationFromProject,
   createProject,
+  listUserFaceAssets,
   listTemplates,
   prisma,
   selectBestProjectHook,
@@ -21,11 +21,13 @@ import {
   sourceStartMessage,
 } from "./messages.js";
 import { deleteCallbackMessage } from "./navigation.js";
+import { createAndEnqueueProjectGeneration } from "./projectGenerationFlow.js";
 import { sendProjectList } from "./projectList.js";
-import { generationJobId, generationQueue, hookJobId, hookQueue } from "./queue.js";
+import { hookJobId, hookQueue } from "./queue.js";
 import { askReferenceForGeneration, saveUploadedReferenceFace, useSavedReferenceFace } from "./referenceFaceFlow.js";
 import { backHomeKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, resetWizard } from "./session.js";
+import { sendFaceGallery, type FaceGalleryMode } from "./faceGallery.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
 
@@ -68,6 +70,19 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
   });
 
   bot.callbackQuery("templates:noop", async (ctx) => {
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(/^faces:browse:(browse|reference|guest):(-?\d+)$/, async (ctx) => {
+    const mode = ctx.match[1] as FaceGalleryMode;
+    const page = Number(ctx.match[2]);
+    const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
+    const faces = await listUserFaceAssets(prisma, user.id, mode === "browse" ? 10 : 6);
+    await ctx.answerCallbackQuery();
+    await sendFaceGallery(ctx, faces, { mode, page, replace: true });
+  });
+
+  bot.callbackQuery("faces:noop", async (ctx) => {
     await ctx.answerCallbackQuery();
   });
 
@@ -118,6 +133,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
 
   bot.callbackQuery("guestface:upload", async (ctx) => {
     ctx.session.step = "guestFaceUpload";
+    ctx.session.faceGalleryMode = "guest";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
     await ctx.reply("Загрузите фото второго человека для podcast countdown.", { reply_markup: backHomeKeyboard() });
@@ -161,6 +177,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
       return;
     }
     ctx.session.step = "referenceUpload";
+    ctx.session.faceGalleryMode = "reference";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
     await ctx.reply(referenceForGenerationPrompt(), { reply_markup: backHomeKeyboard() });
@@ -212,9 +229,13 @@ export async function handleProjectText(ctx: BotContext) {
 }
 
 export async function handleProjectPhoto(ctx: BotContext, token: string) {
-  if (await saveUploadedGuestFace(ctx, token)) {
+  const guestFaceResult = await saveUploadedGuestFace(ctx, token);
+  if (guestFaceResult === "saved") {
     await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId!) });
     await ctx.reply("Сохранил второе лицо. Анализирую ролик и готовлю варианты текста для обложки.");
+    return true;
+  }
+  if (guestFaceResult === "handled") {
     return true;
   }
 
@@ -237,30 +258,25 @@ export async function handleProjectPhoto(ctx: BotContext, token: string) {
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const imageUrl = telegramFileUrl(token, file.file_path);
-  await saveUploadedReferenceFace(ctx, { token, photo, filePath: file.file_path });
-  await createAndEnqueueGeneration(ctx, user.id, imageUrl);
-  await ctx.reply("Принял визуальную основу. Собираю обложку в выбранном стиле.");
+  await ctx.reply("Принял фото. Сначала собираю карту лица для стабильного аватара.");
+  const faceCard = await saveUploadedReferenceFace(ctx, { token, photo, filePath: file.file_path });
+  if (faceCard === false) {
+    return true;
+  }
+  if (await createAndEnqueueProjectGeneration(ctx, { userId: user.id, referenceImageUrl: faceCard?.imageUrl ?? imageUrl })) {
+    resetWizard(ctx);
+    await ctx.reply("Аватар сохранён. Собираю обложку в выбранном стиле.");
+  }
   return true;
 }
 
 async function enqueueGenerationFromReference(ctx: BotContext, referenceImageUrl: string) {
   if (!ctx.session.projectId) return;
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
-  await createAndEnqueueGeneration(ctx, user.id, referenceImageUrl);
-  await ctx.reply("Взял сохранённое лицо. Собираю обложку в выбранном стиле.");
-}
-
-async function createAndEnqueueGeneration(ctx: BotContext, userId: string, referenceImageUrl: string) {
-  if (!ctx.session.projectId) return;
-  const chargeCredits = process.env.FREE_GENERATION_MODE === "false";
-  const generation = await createGenerationFromProject(prisma, {
-    projectId: ctx.session.projectId,
-    userId,
-    referenceImageUrl,
-    chargeCredits
-  });
-  await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from!.id }, { jobId: generationJobId(generation.id) });
-  resetWizard(ctx);
+  if (await createAndEnqueueProjectGeneration(ctx, { userId: user.id, referenceImageUrl })) {
+    resetWizard(ctx);
+    await ctx.reply("Взял сохранённое лицо. Собираю обложку в выбранном стиле.");
+  }
 }
 
 async function createProjectFromSource(

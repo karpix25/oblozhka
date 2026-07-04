@@ -1,4 +1,4 @@
-import type { UserProfile } from "@covers/domain";
+import { TRIAL_CREDITS, type UserProfile } from "@covers/domain";
 import type { DbClient } from "./client.js";
 
 export async function upsertTelegramUser(db: DbClient, profile: UserProfile) {
@@ -8,7 +8,8 @@ export async function upsertTelegramUser(db: DbClient, profile: UserProfile) {
       telegramId: BigInt(profile.telegramId),
       username: profile.username,
       firstName: profile.firstName,
-      languageCode: profile.languageCode
+      languageCode: profile.languageCode,
+      balance: TRIAL_CREDITS
     },
     update: {
       username: profile.username,

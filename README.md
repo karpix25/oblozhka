@@ -17,8 +17,9 @@ The current MVP is focused on one simple user path:
 9. Kie.ai creates the image with `gpt-image-2-image-to-image`.
 10. The worker downloads the temporary provider result, normalizes it with Sharp, stores it in S3, and sends it back in Telegram.
 
-Credit monetization remains in the codebase, but the default product mode is
-`FREE_GENERATION_MODE=true` while pricing is still being shaped.
+New users receive 3 trial credits by default. Paid access is subscription-based:
+Start has 100 monthly credits, Pro has 500 monthly credits, and Business has
+unlimited monthly credits. Unused monthly credits do not roll over.
 
 ## Apps
 

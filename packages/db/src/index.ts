@@ -8,6 +8,7 @@ export * from "./packages.js";
 export * from "./payments.js";
 export * from "./presets.js";
 export * from "./projects.js";
+export * from "./subscriptions.js";
 export * from "./templates.js";
 export * from "./transcripts.js";
 export * from "./users.js";

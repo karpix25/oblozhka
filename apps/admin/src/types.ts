@@ -10,6 +10,8 @@ export type User = {
 
 export type CreditPackage = {
   id: string;
+  slug?: string;
+  plan?: "START" | "PRO" | "BUSINESS";
   title: string;
   description?: string;
   starsPrice: number;

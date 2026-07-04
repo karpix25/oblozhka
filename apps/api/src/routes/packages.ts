@@ -6,7 +6,7 @@ export async function packageRoutes(app: FastifyInstance) {
   app.get("/packages", async () => listPackages(prisma));
 
   app.post<{ Body: CreditPackageInput }>("/packages", async (request, reply) => {
-    if (!request.body.title || !request.body.starsPrice || !request.body.credits) {
+    if (!request.body.title || !Number.isInteger(request.body.starsPrice) || !Number.isInteger(request.body.credits)) {
       return reply.code(400).send({ error: "title, starsPrice and credits are required" });
     }
     return createPackage(prisma, request.body);

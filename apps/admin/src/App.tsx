@@ -91,25 +91,27 @@ function UsersTable({ users, onChanged }: { users: User[]; onChanged: () => void
 
 function PackagesTable({ packages, onChanged }: { packages: CreditPackage[]; onChanged: () => void }) {
   async function create() {
-    const title = prompt("Package title");
+    const title = prompt("Tariff title");
     const starsPrice = Number(prompt("Stars price"));
-    const credits = Number(prompt("Credits"));
+    const credits = Number(prompt("Monthly credits, 0 for unlimited"));
+    const plan = prompt("Plan code: START, PRO, BUSINESS") as CreditPackage["plan"];
     if (!title || !Number.isInteger(starsPrice) || !Number.isInteger(credits)) return;
-    await adminApi.createPackage({ title, starsPrice, credits });
+    await adminApi.createPackage({ title, starsPrice, credits, plan: plan || undefined, slug: plan?.toLowerCase() });
     onChanged();
   }
 
   return (
     <>
-      <button className="primary" onClick={create}>New package</button>
+      <button className="primary" onClick={create}>New tariff</button>
       <table>
-        <thead><tr><th>Title</th><th>Stars</th><th>Credits</th><th>Active</th><th /></tr></thead>
+        <thead><tr><th>Title</th><th>Plan</th><th>Stars</th><th>Credits/mo</th><th>Active</th><th /></tr></thead>
         <tbody>
           {packages.map((pack) => (
             <tr key={pack.id}>
               <td>{pack.title}</td>
+              <td>{pack.plan ?? "legacy"}</td>
               <td>{pack.starsPrice}</td>
-              <td>{pack.credits}</td>
+              <td>{pack.plan === "BUSINESS" ? "unlimited" : pack.credits}</td>
               <td>{pack.isActive ? "yes" : "no"}</td>
               <td>
                 <button onClick={() => adminApi.updatePackage(pack.id, { isActive: !pack.isActive }).then(onChanged)}>

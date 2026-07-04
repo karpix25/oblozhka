@@ -1,29 +1,20 @@
 import {
-  completeStarsPayment,
   createGeneration,
-  createPendingPayment,
-  findUserByTelegramId,
-  listActivePackages,
   prisma,
+  seedDefaultTariffPackages,
   seedDefaultTemplates,
   upsertTelegramUser
 } from "@covers/db";
 import type { CoverFormat, ReferenceMode, WizardInput } from "@covers/domain";
-import {
-  createStarsInvoice,
-  encodeInvoicePayload,
-  normalizeSuccessfulPayment,
-  TELEGRAM_STARS_CURRENCY
-} from "@covers/telegram-payments";
 import { Bot, session } from "grammy";
-import { randomUUID } from "node:crypto";
 import { handleLegacyReplyMenuText, hideReplyMenu } from "./legacyReplyMenu.js";
-import { documentsKeyboard, documentsMessage, tariffsMessage } from "./compliance.js";
+import { documentsKeyboard, documentsMessage } from "./compliance.js";
+import { insufficientCreditsMessage } from "./billingMessages.js";
+import { registerBillingHandlers } from "./billingHandlers.js";
 import {
   confirmKeyboard,
   formatKeyboard,
   nicheKeyboard,
-  packagesKeyboard,
   referenceModeKeyboard,
   styleKeyboard,
 } from "./keyboards.js";
@@ -40,7 +31,7 @@ import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
 import { generationJobId, generationQueue } from "./queue.js";
-import { balanceKeyboard, backHomeKeyboard, projectsKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
+import { balanceKeyboard, backHomeKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
 import { profileFromContext } from "./userProfile.js";
 
@@ -52,6 +43,8 @@ if (!token) {
 const bot = new Bot<BotContext>(token);
 bot.use(session({ initial: initialSession }));
 await seedDefaultTemplates(prisma);
+await seedDefaultTariffPackages(prisma);
+registerBillingHandlers(bot);
 registerProjectHandlers(bot, token);
 
 bot.command("start", async (ctx) => {
@@ -64,16 +57,8 @@ bot.command("terms", async (ctx) => ctx.reply(termsMessage(), { reply_markup: do
 bot.command("docs", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
 bot.command("privacy", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
 bot.command("agreement", async (ctx) => ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() }));
-bot.command("tariffs", async (ctx) => ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() }));
 bot.command("support", async (ctx) => ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() }));
 bot.command("paysupport", async (ctx) => ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() }));
-
-bot.callbackQuery("balance", async (ctx) => {
-  const user = await findUserByTelegramId(prisma, ctx.from.id);
-  await ctx.answerCallbackQuery();
-  await deleteCallbackMessage(ctx);
-  await ctx.reply(`Доступно обложек: ${user?.balance ?? 0}`, { reply_markup: balanceKeyboard() });
-});
 
 bot.callbackQuery("support", async (ctx) => {
   await ctx.answerCallbackQuery();
@@ -100,68 +85,6 @@ bot.callbackQuery("documents", async (ctx) => {
   await ctx.reply(documentsMessage(), { reply_markup: documentsKeyboard() });
 });
 
-bot.callbackQuery("tariffs", async (ctx) => {
-  await ctx.answerCallbackQuery();
-  await deleteCallbackMessage(ctx);
-  await ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() });
-});
-
-bot.callbackQuery("packages", async (ctx) => {
-  const packages = await listActivePackages(prisma);
-  await ctx.answerCallbackQuery();
-  await deleteCallbackMessage(ctx);
-  if (packages.length === 0) {
-    await ctx.reply("Пакеты обложек пока не настроены.", { reply_markup: backHomeKeyboard("tariffs") });
-    return;
-  }
-  await ctx.reply("Выберите пакет:", { reply_markup: packagesKeyboard(packages) });
-});
-
-bot.callbackQuery(/^buy:(.+)$/, async (ctx) => {
-  const packageId = ctx.match[1];
-  const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
-  const pack = await prisma.creditPackage.findUnique({ where: { id: packageId } });
-  if (!pack || !pack.isActive) {
-    await ctx.answerCallbackQuery("Пакет недоступен.");
-    return;
-  }
-
-  const payload = encodeInvoicePayload({ packageId, userId: user.id, nonce: randomUUID() });
-  await createPendingPayment(prisma, {
-    userId: user.id,
-    packageId,
-    payload,
-    starsAmount: pack.starsPrice,
-    credits: pack.credits
-  });
-  const invoice = createStarsInvoice({
-    title: pack.title,
-    description: pack.description ?? undefined,
-    starsPrice: pack.starsPrice,
-    credits: pack.credits,
-    payload
-  });
-
-  await ctx.answerCallbackQuery();
-  await deleteCallbackMessage(ctx);
-  await ctx.api.sendInvoice(ctx.chat!.id, invoice.title, invoice.description, invoice.payload, invoice.currency, invoice.prices);
-});
-
-bot.on("pre_checkout_query", async (ctx) => {
-  await ctx.answerPreCheckoutQuery(true);
-});
-
-bot.on("message:successful_payment", async (ctx) => {
-  const payment = normalizeSuccessfulPayment(ctx.message.successful_payment);
-  if (payment.currency !== TELEGRAM_STARS_CURRENCY) {
-    await ctx.reply("Оплата получена в неподдерживаемой валюте. Напишите в поддержку.");
-    return;
-  }
-  const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
-  await completeStarsPayment(prisma, { userId: user.id, payment });
-  const refreshed = await findUserByTelegramId(prisma, ctx.from!.id);
-  await ctx.reply(`Оплата прошла. Доступно обложек: ${refreshed?.balance ?? 0}`);
-});
 
 bot.callbackQuery("generate:start", async (ctx) => {
   resetWizard(ctx);
@@ -297,14 +220,16 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   try {
-    const chargeCredits = process.env.FREE_GENERATION_MODE === "false";
     const generation = await createGeneration(prisma, {
       userId: user.id,
       wizard: draft,
       prompt: "Prompt will be planned by OpenRouter in the worker.",
-      chargeCredits
+      chargeCredits: true
     });
-    await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from.id }, { jobId: generationJobId(generation.id) });
+    await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from.id }, {
+      jobId: generationJobId(generation.id),
+      priority: generation.queuePriority
+    });
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
@@ -313,7 +238,7 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
     const message = error instanceof Error ? error.message : "Не удалось создать генерацию.";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(message === "Insufficient credits." ? "Недостаточно доступных обложек. Пополните баланс." : message);
+    await ctx.reply(message === "Insufficient credits." ? insufficientCreditsMessage() : message, { reply_markup: balanceKeyboard() });
   }
 });
 

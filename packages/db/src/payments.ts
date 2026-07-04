@@ -1,6 +1,6 @@
 import type { SuccessfulPayment } from "@covers/telegram-payments";
 import type { DbClient } from "./client.js";
-import { mutateCreditsInTransaction } from "./credits.js";
+import { activateSubscriptionInTransaction } from "./subscriptions.js";
 
 export async function createPendingPayment(
   db: DbClient,
@@ -42,13 +42,31 @@ export async function completeStarsPayment(
       }
     });
 
-    await mutateCreditsInTransaction(tx, {
-      userId: input.userId,
-      amount: payment.creditsGranted,
-      reason: "PURCHASE",
-      referenceId: payment.id,
-      note: "Telegram Stars purchase"
-    });
+    const pack = existing.packageId
+      ? await tx.creditPackage.findUnique({ where: { id: existing.packageId } })
+      : null;
+
+    if (pack?.plan) {
+      await activateSubscriptionInTransaction(tx, {
+        userId: input.userId,
+        plan: pack.plan,
+        sourcePaymentId: payment.id
+      });
+    } else if (payment.creditsGranted > 0) {
+      await tx.creditLedgerEntry.create({
+        data: {
+          userId: input.userId,
+          amount: payment.creditsGranted,
+          reason: "PURCHASE",
+          referenceId: payment.id,
+          note: "Legacy credits purchase"
+        }
+      });
+      await tx.user.update({
+        where: { id: input.userId },
+        data: { balance: { increment: payment.creditsGranted } }
+      });
+    }
 
     return payment;
   });

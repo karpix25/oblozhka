@@ -1,13 +1,17 @@
 import {
+  countUserFaceAssets,
   createUserFaceAsset,
   findUserFaceAsset,
+  getBillingAccess,
   listUserFaceAssets,
   prisma,
   setProjectGuestFaceAsset,
   updateUserFaceAssetUrl,
   upsertTelegramUser
 } from "@covers/db";
-import { InlineKeyboard } from "grammy";
+import { avatarLimitMessage } from "./billingMessages.js";
+import { prepareFaceCard } from "./faceCardGenerator.js";
+import { sendFaceGallery } from "./faceGallery.js";
 import type { BotContext } from "./session.js";
 import { backHomeKeyboard } from "./sectionKeyboards.js";
 import { profileFromContext } from "./userProfile.js";
@@ -20,7 +24,12 @@ export async function askGuestFace(ctx: BotContext) {
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const faces = await listUserFaceAssets(prisma, user.id, 4);
   ctx.session.step = "guestFaceUpload";
-  await ctx.reply(guestFacePrompt(), { reply_markup: guestFaceKeyboard(faces) });
+  ctx.session.faceGalleryMode = "guest";
+  if (faces.length === 0) {
+    await ctx.reply(guestFacePrompt(), { reply_markup: backHomeKeyboard() });
+    return;
+  }
+  await sendFaceGallery(ctx, faces, { mode: "guest" });
 }
 
 export async function useSavedGuestFace(ctx: BotContext, faceId: string, token: string) {
@@ -58,31 +67,36 @@ export async function saveUploadedGuestFace(ctx: BotContext, token: string) {
     await ctx.reply("Не получилось прочитать фото второго человека. Попробуйте другое изображение.", {
       reply_markup: backHomeKeyboard()
     });
-    return true;
+    return "handled";
   }
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
-  const imageUrl = telegramFileUrl(token, file.file_path);
+  const access = await getBillingAccess(prisma, user.id);
+  const faceCount = await countUserFaceAssets(prisma, user.id);
+  if (access.avatarLimit !== null && faceCount >= access.avatarLimit) {
+    await ctx.reply(avatarLimitMessage(access.avatarLimit), { reply_markup: backHomeKeyboard("tariffs") });
+    return "handled";
+  }
+
+  const sourceImageUrl = telegramFileUrl(token, file.file_path);
+  const faceCard = await prepareFaceCard({
+    sourceImageUrl,
+    telegramFilePath: file.file_path,
+    userId: user.id,
+    telegramFileId: photo.file_id
+  });
   const face = await createUserFaceAsset(prisma, {
     userId: user.id,
-    imageUrl,
+    imageUrl: faceCard.imageUrl,
     telegramFileId: photo.file_id,
     title: `Гость ${new Date().toLocaleDateString("ru-RU")}`,
-    metadata: { telegramFilePath: file.file_path }
+    metadata: { role: "guest-reference", ...faceCard.metadata }
   });
   await setProjectGuestFaceAsset(prisma, ctx.session.projectId, face.id);
   ctx.session.step = "idle";
+  ctx.session.faceGalleryMode = undefined;
   await ctx.reply("Сохранил второе лицо. В следующих проектах предложу его быстрым выбором.");
-  return true;
-}
-
-function guestFaceKeyboard(faces: Array<{ id: string; title: string | null; createdAt: Date }>) {
-  const keyboard = new InlineKeyboard();
-  faces.forEach((face, index) => {
-    keyboard.text(`👥 ${face.title ?? `Гость ${index + 1}`}`, `guestface:use:${face.id}`).row();
-  });
-  keyboard.text("📤 Загрузить новое фото", "guestface:upload").row().text("🏠 В начало", "home");
-  return keyboard;
+  return "saved";
 }
 
 function guestFacePrompt() {
@@ -103,12 +117,22 @@ async function refreshTelegramFaceUrl(
   face: { id: string; telegramFileId: string | null; imageUrl: string; metadata: unknown },
   token: string
 ) {
+  if (hasGeneratedFaceCard(face.metadata)) return face;
   if (!face.telegramFileId) return face;
   const file = await ctx.api.getFile(face.telegramFileId);
   if (!file.file_path) return face;
   return updateUserFaceAssetUrl(prisma, face.id, telegramFileUrl(token, file.file_path), {
     ...(typeof face.metadata === "object" && face.metadata ? face.metadata : {}),
-    telegramFilePath: file.file_path,
+    sourceTelegramFilePath: file.file_path,
     refreshedAt: new Date().toISOString()
   });
+}
+
+function hasGeneratedFaceCard(metadata: unknown) {
+  return Boolean(
+    typeof metadata === "object" &&
+      metadata &&
+      "faceCardStatus" in metadata &&
+      metadata.faceCardStatus === "generated"
+  );
 }

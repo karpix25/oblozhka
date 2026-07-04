@@ -1,14 +1,19 @@
 import {
+  countUserFaceAssets,
   createUserFaceAsset,
   findProject,
   findUserFaceAsset,
+  getBillingAccess,
   listUserFaceAssets,
   prisma,
   updateUserFaceAssetUrl,
   upsertTelegramUser
 } from "@covers/db";
-import { InlineKeyboard } from "grammy";
+import { avatarLimitMessage } from "./billingMessages.js";
+import { prepareFaceCard } from "./faceCardGenerator.js";
+import { sendFaceGallery } from "./faceGallery.js";
 import { referenceForGenerationPrompt } from "./messages.js";
+import { backHomeKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 import { profileFromContext } from "./userProfile.js";
 
@@ -21,7 +26,12 @@ export async function askReferenceForGeneration(ctx: BotContext) {
   const project = ctx.session.projectId ? await findProject(prisma, ctx.session.projectId) : null;
   const faces = project?.platform === "FACELESS" ? [] : await listUserFaceAssets(prisma, user.id, 6);
   ctx.session.step = "referenceUpload";
-  await ctx.reply(referenceForGenerationPrompt(), { reply_markup: referenceFaceKeyboard(faces) });
+  ctx.session.faceGalleryMode = "reference";
+  if (faces.length === 0) {
+    await ctx.reply(referenceForGenerationPrompt(), { reply_markup: backHomeKeyboard() });
+    return;
+  }
+  await sendFaceGallery(ctx, faces, { mode: "reference" });
 }
 
 export async function useSavedReferenceFace(ctx: BotContext, faceId: string, token: string) {
@@ -52,26 +62,33 @@ export async function saveUploadedReferenceFace(
   if (project?.platform === "FACELESS") return;
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
+  const access = await getBillingAccess(prisma, user.id);
+  const faceCount = await countUserFaceAssets(prisma, user.id);
+  if (access.avatarLimit !== null && faceCount >= access.avatarLimit) {
+    await ctx.reply(avatarLimitMessage(access.avatarLimit), { reply_markup: backHomeKeyboard("tariffs") });
+    return false;
+  }
+
+  const sourceImageUrl = telegramFileUrl(input.token, input.filePath);
+  const faceCard = await prepareFaceCard({
+    sourceImageUrl,
+    telegramFilePath: input.filePath,
+    userId: user.id,
+    telegramFileId: input.photo.file_id
+  });
   await createUserFaceAsset(prisma, {
     userId: user.id,
-    imageUrl: telegramFileUrl(input.token, input.filePath),
+    imageUrl: faceCard.imageUrl,
     telegramFileId: input.photo.file_id,
-    title: `Моё лицо ${new Date().toLocaleDateString("ru-RU")}`,
+    title: `Аватар ${new Date().toLocaleDateString("ru-RU")}`,
     metadata: {
       role: "primary-reference",
-      telegramFilePath: input.filePath,
-      projectId: ctx.session.projectId
+      projectId: ctx.session.projectId,
+      ...faceCard.metadata
     }
   });
-}
 
-function referenceFaceKeyboard(faces: Array<{ id: string; title: string | null; createdAt: Date }>) {
-  const keyboard = new InlineKeyboard();
-  faces.forEach((face, index) => {
-    keyboard.text(`👤 ${face.title ?? `Лицо ${index + 1}`}`, `referenceface:use:${face.id}`).row();
-  });
-  keyboard.text("📤 Загрузить новое фото", "referenceface:upload").row().text("🏠 В начало", "home");
-  return keyboard;
+  return faceCard;
 }
 
 async function refreshTelegramFaceUrl(
@@ -79,16 +96,26 @@ async function refreshTelegramFaceUrl(
   face: { id: string; telegramFileId: string | null; imageUrl: string; metadata: unknown },
   token: string
 ) {
+  if (hasGeneratedFaceCard(face.metadata)) return face;
   if (!face.telegramFileId) return face;
   const file = await ctx.api.getFile(face.telegramFileId);
   if (!file.file_path) return face;
   return updateUserFaceAssetUrl(prisma, face.id, telegramFileUrl(token, file.file_path), {
     ...(typeof face.metadata === "object" && face.metadata ? face.metadata : {}),
-    telegramFilePath: file.file_path,
+    sourceTelegramFilePath: file.file_path,
     refreshedAt: new Date().toISOString()
   });
 }
 
 function telegramFileUrl(token: string, filePath: string) {
   return `https://api.telegram.org/file/bot${token}/${filePath}`;
+}
+
+function hasGeneratedFaceCard(metadata: unknown) {
+  return Boolean(
+    typeof metadata === "object" &&
+      metadata &&
+      "faceCardStatus" in metadata &&
+      metadata.faceCardStatus === "generated"
+  );
 }

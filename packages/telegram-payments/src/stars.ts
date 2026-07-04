@@ -42,7 +42,7 @@ export function createStarsInvoice(input: {
 }): StarsInvoice {
   return {
     title: input.title,
-    description: input.description ?? `${input.credits} обложек`,
+    description: input.description ?? (input.credits > 0 ? `${input.credits} кредитов на 30 дней` : "Безлимитные кредиты на 30 дней"),
     payload: input.payload,
     currency: TELEGRAM_STARS_CURRENCY,
     provider_token: "",

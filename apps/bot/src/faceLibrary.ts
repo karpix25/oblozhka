@@ -1,6 +1,7 @@
 import { listUserFaceAssets, prisma, upsertTelegramUser } from "@covers/db";
 import { InputFile } from "grammy";
 import { faceUploadGuidePath } from "./assets.js";
+import { sendFaceGallery } from "./faceGallery.js";
 import { deleteCallbackMessage } from "./navigation.js";
 import { facesKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
@@ -19,20 +20,7 @@ export async function sendFaceLibrary(ctx: BotContext) {
     return;
   }
 
-  await ctx.replyWithPhoto(new InputFile(faceUploadGuidePath()), {
-    caption: "Такое фото лучше всего подходит для стабильных обложек с вашим лицом."
-  });
-
-  await ctx.reply(
-    [
-      "Сохранённые лица:",
-      "",
-      ...faces.map((face, index) => `${index + 1}. ${face.title ?? "Лицо"} · ${face.createdAt.toLocaleDateString("ru-RU")}`),
-      "",
-      "При создании обложки я предложу быстрый выбор этих фото."
-    ].join("\n"),
-    { reply_markup: keyboard }
-  );
+  await sendFaceGallery(ctx, faces, { mode: "browse" });
 }
 
 export async function openFaceLibrary(ctx: BotContext, input: { fromCallback?: boolean } = {}) {

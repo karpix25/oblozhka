@@ -1,6 +1,6 @@
-import { generationDebit, type ProjectPlatform, type WizardInput } from "@covers/domain";
+import type { ProjectPlatform, WizardInput } from "@covers/domain";
 import type { DbClient } from "./client.js";
-import { mutateCreditsInTransaction } from "./credits.js";
+import { debitGenerationCreditInTransaction, refundGenerationCreditInTransaction } from "./credits.js";
 
 export async function createGeneration(
   db: DbClient,
@@ -24,16 +24,19 @@ export async function createGeneration(
     });
 
     if (generation.creditCost > 0) {
-      await mutateCreditsInTransaction(tx, {
+      const { access } = await debitGenerationCreditInTransaction(tx, {
         userId: input.userId,
-        amount: generationDebit(generation.creditCost),
-        reason: "GENERATION_DEBIT",
+        amount: generation.creditCost,
         referenceId: generation.id,
         note: "Image generation"
       });
+      await tx.generation.update({
+        where: { id: generation.id },
+        data: generationBillingData(access)
+      });
     }
 
-    return generation;
+    return tx.generation.findUniqueOrThrow({ where: { id: generation.id } });
   });
 }
 
@@ -82,12 +85,15 @@ export async function createGenerationFromProject(
     });
 
     if (generation.creditCost > 0) {
-      await mutateCreditsInTransaction(tx, {
+      const { access } = await debitGenerationCreditInTransaction(tx, {
         userId: input.userId,
-        amount: generationDebit(generation.creditCost),
-        reason: "GENERATION_DEBIT",
+        amount: generation.creditCost,
         referenceId: generation.id,
         note: "Project thumbnail generation"
+      });
+      await tx.generation.update({
+        where: { id: generation.id },
+        data: generationBillingData(access)
       });
     }
 
@@ -96,8 +102,19 @@ export async function createGenerationFromProject(
       data: { status: "GENERATION_PENDING" }
     });
 
-    return generation;
+    return tx.generation.findUniqueOrThrow({ where: { id: generation.id } });
   });
+}
+
+function generationBillingData(access: Awaited<ReturnType<typeof debitGenerationCreditInTransaction>>["access"]) {
+  if (access.kind === "subscription") {
+    return {
+      chargedPlan: access.plan,
+      chargedSubscriptionId: access.subscriptionId,
+      queuePriority: access.queuePriority
+    };
+  }
+  return { queuePriority: access.queuePriority };
 }
 
 function formatForPlatform(platform: ProjectPlatform) {
@@ -149,11 +166,11 @@ export async function markGenerationFailed(db: DbClient, id: string, errorMessag
     });
 
     if (generation.creditCost > 0 && !existingRefund) {
-      await mutateCreditsInTransaction(tx, {
+      await refundGenerationCreditInTransaction(tx, {
         userId: generation.userId,
         amount: generation.creditCost,
-        reason: "GENERATION_REFUND",
         referenceId: generation.id,
+        chargedSubscriptionId: generation.chargedSubscriptionId,
         note: "Generation failed"
       });
     }
