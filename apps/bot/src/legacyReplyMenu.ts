@@ -22,9 +22,10 @@ const legacyMenuLabels = {
 const removeReplyKeyboard = { remove_keyboard: true } as const;
 
 export async function hideReplyMenu(ctx: BotContext) {
-  await ctx.reply("Убрал нижнее меню. Теперь все действия — в кнопках под сообщениями.", {
+  const cleanupMessage = await ctx.reply("Обновляю меню.", {
     reply_markup: removeReplyKeyboard
   });
+  await ctx.api.deleteMessage(ctx.chat!.id, cleanupMessage.message_id).catch(() => undefined);
 }
 
 export async function handleLegacyReplyMenuText(ctx: BotContext) {
