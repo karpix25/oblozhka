@@ -8,7 +8,9 @@ import {
 import type { CoverFormat, ReferenceMode, WizardInput } from "@covers/domain";
 import { Bot, session } from "grammy";
 import { handleLegacyReplyMenuText, hideReplyMenu } from "./legacyReplyMenu.js";
+import { createBotAbuseGuard } from "./abuseGuard.js";
 import { documentsKeyboard, documentsMessage } from "./compliance.js";
+import { enqueueGenerationOrCompensate } from "./generationQueueing.js";
 import { insufficientCreditsMessage } from "./billingMessages.js";
 import { registerBillingHandlers } from "./billingHandlers.js";
 import {
@@ -30,7 +32,7 @@ import {
 import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
-import { generationJobId, generationQueue, hookQueue } from "./queue.js";
+import { faceCardQueue, generationQueue, hookQueue } from "./queue.js";
 import { balanceKeyboard, backHomeKeyboard, insufficientCreditsKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
 import { createBotSessionStorage } from "./sessionStorage.js";
@@ -44,11 +46,12 @@ if (!token) {
 
 const bot = new Bot<BotContext>(token);
 const sessionStorage = createBotSessionStorage();
+const abuseGuard = createBotAbuseGuard();
 bot.use(session({ initial: initialSession, storage: sessionStorage.storage }));
 await seedDefaultTemplates(prisma);
 await seedDefaultTariffPackages(prisma);
 registerBillingHandlers(bot);
-registerProjectHandlers(bot, token);
+registerProjectHandlers(bot, token, abuseGuard);
 
 bot.command("start", async (ctx) => {
   await upsertTelegramUser(prisma, profileFromContext(ctx));
@@ -152,7 +155,7 @@ bot.callbackQuery(/^style:(.+)$/, async (ctx) => {
 });
 
 bot.on("message:photo", async (ctx) => {
-  if (await handleProjectPhoto(ctx, token)) return;
+  if (await handleProjectPhoto(ctx, token, abuseGuard)) return;
 
   if (ctx.session.step !== "referenceUpload") {
     await ctx.reply("Фото получил. Чтобы использовать его для обложки, нажмите «Создать обложку».", {
@@ -164,6 +167,9 @@ bot.on("message:photo", async (ctx) => {
   const photo = ctx.message.photo.at(-1);
   if (!photo) {
     await ctx.reply("Не получилось прочитать фото. Попробуйте отправить изображение ещё раз.");
+    return;
+  }
+  if (!(await abuseGuard.consume(ctx, "asset-upload"))) {
     return;
   }
 
@@ -183,7 +189,7 @@ bot.on("message:photo", async (ctx) => {
 
 bot.on("message:text", async (ctx) => {
   if (await handleLegacyReplyMenuText(ctx)) return;
-  if (await handleProjectText(ctx)) return;
+  if (await handleProjectText(ctx, abuseGuard)) return;
 
   if (ctx.session.step === "topic") {
     const topic = ctx.message.text.trim();
@@ -220,6 +226,9 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
     await ctx.answerCallbackQuery("Начните генерацию заново.");
     return;
   }
+  if (!(await abuseGuard.consume(ctx, "cover-generation"))) {
+    return;
+  }
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   try {
@@ -229,10 +238,7 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
       prompt: "Prompt will be planned by OpenRouter in the worker.",
       chargeCredits: true
     });
-    await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from.id }, {
-      jobId: generationJobId(generation.id),
-      priority: generation.queuePriority
-    });
+    await enqueueGenerationOrCompensate(generation, ctx.from.id);
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
@@ -266,7 +272,9 @@ await startBotRuntime(bot, {
     await Promise.all([
       generationQueue.close(),
       hookQueue.close(),
+      faceCardQueue.close(),
       sessionStorage.close(),
+      Promise.resolve(abuseGuard.close()),
       prisma.$disconnect()
     ]);
   }

@@ -1,6 +1,6 @@
 import { createGenerationFromProject, prisma } from "@covers/db";
 import { insufficientCreditsMessage } from "./billingMessages.js";
-import { generationJobId, generationQueue } from "./queue.js";
+import { enqueueGenerationOrCompensate } from "./generationQueueing.js";
 import { backHomeKeyboard, insufficientCreditsKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 
@@ -17,10 +17,7 @@ export async function createAndEnqueueProjectGeneration(
       referenceImageUrl: input.referenceImageUrl,
       chargeCredits: true
     });
-    await generationQueue.add("generate-cover", { generationId: generation.id, userTelegramId: ctx.from!.id }, {
-      jobId: generationJobId(generation.id),
-      priority: generation.queuePriority
-    });
+    await enqueueGenerationOrCompensate(generation, ctx.from!.id);
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось создать генерацию.";

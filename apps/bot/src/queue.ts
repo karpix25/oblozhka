@@ -7,6 +7,7 @@ import {
   type HookJobData
 } from "@covers/domain";
 import { Queue, type DefaultJobOptions } from "bullmq";
+export { faceCardJobId, generationJobId, hookJobId } from "./jobIds.js";
 
 const redisUrl = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
 const defaultJobOptions: DefaultJobOptions = {
@@ -56,19 +57,3 @@ export const faceCardQueue = new Queue<FaceCardJobData, void, string>(FACE_CARD_
   },
   defaultJobOptions
 });
-
-export function hookJobId(projectId: string) {
-  return `hooks-${safeJobIdPart(projectId)}`;
-}
-
-export function generationJobId(generationId: string) {
-  return `generation-${safeJobIdPart(generationId)}`;
-}
-
-export function faceCardJobId(faceAssetId: string) {
-  return `face-card-${safeJobIdPart(faceAssetId)}`;
-}
-
-function safeJobIdPart(value: string) {
-  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
-}

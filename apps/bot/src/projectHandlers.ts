@@ -12,6 +12,7 @@ import {
 } from "@covers/db";
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
+import type { BotAbuseGuard } from "./abuseGuard.js";
 import { openFaceLibrary } from "./faceLibrary.js";
 import { platformKeyboard, sourceTypeKeyboard, styleSourceKeyboard } from "./keyboards.js";
 import { askGuestFace, requiresGuestFace, saveUploadedGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
@@ -33,7 +34,7 @@ import { openStyleLibrary, saveUploadedStyle, selectUserStyleForProject, startSt
 import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
 
-export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
+export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abuseGuard: BotAbuseGuard) {
   bot.callbackQuery("project:start", async (ctx) => {
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
@@ -174,6 +175,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
 
   async function enqueueHooks(ctx: BotContext) {
     if (!ctx.session.projectId) return;
+    if (!(await abuseGuard.consume(ctx, "hook-generation"))) return;
     await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId) });
     await ctx.reply("Анализирую ролик и готовлю варианты текста для обложки.");
   }
@@ -201,7 +203,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     const imageUrl = await useSavedReferenceFace(ctx, ctx.match[1], token);
     if (!imageUrl) return;
     await deleteCallbackMessage(ctx);
-    await enqueueGenerationFromReference(ctx, imageUrl);
+    await enqueueGenerationFromReference(ctx, imageUrl, abuseGuard);
   });
 
   bot.callbackQuery("referenceface:upload", async (ctx) => {
@@ -223,6 +225,9 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
       });
       return;
     }
+    if (!(await abuseGuard.consume(ctx, "source-submit"))) {
+      return;
+    }
     const file = await ctx.api.getFile(ctx.message.video.file_id);
     await createProjectFromSource(ctx, "VIDEO", {
       fileId: ctx.message.video.file_id,
@@ -233,13 +238,16 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
   });
 }
 
-export async function handleProjectText(ctx: BotContext) {
+export async function handleProjectText(ctx: BotContext, abuseGuard: BotAbuseGuard) {
   if (ctx.session.step === "sourceLink") {
     const url = ctx.message?.text?.trim() ?? "";
     if (!url.startsWith("http")) {
       await ctx.reply("Похоже, это не ссылка. Отправьте URL, который начинается с http или https.", {
         reply_markup: backHomeKeyboard()
       });
+      return true;
+    }
+    if (!(await abuseGuard.consume(ctx, "source-submit"))) {
       return true;
     }
     await createProjectFromSource(ctx, "LINK", { url });
@@ -254,6 +262,9 @@ export async function handleProjectText(ctx: BotContext) {
       });
       return true;
     }
+    if (!(await abuseGuard.consume(ctx, "source-submit"))) {
+      return true;
+    }
     await createProjectFromSource(ctx, "TRANSCRIPT", { text });
     return true;
   }
@@ -261,13 +272,18 @@ export async function handleProjectText(ctx: BotContext) {
   return false;
 }
 
-export async function handleProjectPhoto(ctx: BotContext, token: string) {
+export async function handleProjectPhoto(ctx: BotContext, token: string, abuseGuard: BotAbuseGuard) {
+  if (ownsProjectPhotoFlow(ctx) && !(await abuseGuard.consume(ctx, "asset-upload"))) {
+    return true;
+  }
+
   if (await saveUploadedStyle(ctx, token)) {
     return true;
   }
 
   const guestFaceResult = await saveUploadedGuestFace(ctx, token);
   if (guestFaceResult === "saved") {
+    if (!(await abuseGuard.consume(ctx, "hook-generation"))) return true;
     await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId!) });
     await ctx.reply("Сохранил второе лицо. Анализирую ролик и готовлю варианты текста для обложки.");
     return true;
@@ -307,8 +323,13 @@ export async function handleProjectPhoto(ctx: BotContext, token: string) {
   return true;
 }
 
-async function enqueueGenerationFromReference(ctx: BotContext, referenceImageUrl: string) {
+async function enqueueGenerationFromReference(
+  ctx: BotContext,
+  referenceImageUrl: string,
+  abuseGuard: BotAbuseGuard
+) {
   if (!ctx.session.projectId) return;
+  if (!(await abuseGuard.consume(ctx, "cover-generation"))) return;
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   if (await createAndEnqueueProjectGeneration(ctx, { userId: user.id, referenceImageUrl })) {
     resetWizard(ctx);
@@ -330,4 +351,12 @@ async function createProjectFromSource(
 
 function telegramFileUrl(token: string, filePath: string) {
   return `https://api.telegram.org/file/bot${token}/${filePath}`;
+}
+
+function ownsProjectPhotoFlow(ctx: BotContext) {
+  return (
+    ctx.session.step === "styleUpload" ||
+    ctx.session.step === "guestFaceUpload" ||
+    Boolean(ctx.session.projectId && ctx.session.step === "referenceUpload")
+  );
 }

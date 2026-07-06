@@ -3,8 +3,8 @@ import { Bot, InputFile } from "grammy";
 type GenerationDelivery = {
   previewUrl: string;
   originalUrl: string;
-  previewBytes: Buffer;
-  originalBytes: Buffer;
+  previewBytes?: Buffer;
+  originalBytes?: Buffer;
 };
 
 export class TelegramNotifier {
@@ -34,6 +34,9 @@ export class TelegramNotifier {
     });
 
     if (!hasPublicFinalUrl) {
+      if (!delivery.originalBytes) {
+        throw new Error("Original bytes are required when final URL is not public.");
+      }
       await this.bot.api.sendDocument(chatId, new InputFile(delivery.originalBytes, "cover.png"));
     }
   }
@@ -65,6 +68,9 @@ export class TelegramNotifier {
 
 function photoInput(delivery: GenerationDelivery) {
   if (isPublicHttpUrl(delivery.previewUrl)) return delivery.previewUrl;
+  if (!delivery.previewBytes) {
+    throw new Error("Preview bytes are required when preview URL is not public.");
+  }
   return new InputFile(delivery.previewBytes, "preview.jpg");
 }
 

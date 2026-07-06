@@ -5,6 +5,7 @@ export * from "./faceCards.js";
 export * from "./formats.js";
 export * from "./plans.js";
 export * from "./queues.js";
+export * from "./rateLimits.js";
 export * from "./templates.js";
 export * from "./templateDisplay.js";
 export * from "./types.js";

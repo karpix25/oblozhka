@@ -68,6 +68,15 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
       throw new Error(`Generation ${job.data.generationId} was not found.`);
     }
 
+    if (isDeliveredGeneration(generation)) {
+      await notifier.sendGenerationResult(job.data.userTelegramId, {
+        previewUrl: generation.previewUrl,
+        originalUrl: generation.originalUrl
+      });
+      return;
+    }
+
+    let persistedSuccess = false;
     await markGenerationProcessing(prisma, generation.id);
     const spec = getFormatSpec(generation.format);
 
@@ -122,7 +131,8 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         const referenceUrls = await prepareReferenceImageUrls({
           generationId: generation.id,
           urls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
-          storage
+          storage,
+          signal
         });
         throwIfAborted(signal, "Generation job");
         const styleReferenceUrl = generation.userStyleAsset?.imageUrl ?? generation.userStyleAsset?.sourceImageUrl;
@@ -163,6 +173,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           previewUrl,
           providerMeta: { imageModel: result.model, promptPlannerModel: plan.model, raw: result.raw }
         });
+        persistedSuccess = true;
         if (generation.projectId) {
           await markProjectStatus(prisma, generation.projectId, projectStatusAfterGeneration("SUCCEEDED"));
         }
@@ -180,6 +191,9 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         attempts: job.opts.attempts,
         error
       });
+      if (persistedSuccess) {
+        throw error;
+      }
       if (isFinalAttempt(job)) {
         await markGenerationFailed(prisma, generation.id, error instanceof Error ? error.message : "Unknown error");
         if (generation.projectId) {
@@ -266,4 +280,11 @@ async function ensureProjectTranscript(project: NonNullable<Awaited<ReturnType<t
 
   await markProjectStatus(prisma, project.id, "SOURCE_READY");
   return result.text;
+}
+
+type WorkerGeneration = NonNullable<Awaited<ReturnType<typeof findGeneration>>>;
+type DeliveredGeneration = WorkerGeneration & { status: "SUCCEEDED"; previewUrl: string; originalUrl: string };
+
+function isDeliveredGeneration(generation: WorkerGeneration): generation is DeliveredGeneration {
+  return generation.status === "SUCCEEDED" && Boolean(generation.previewUrl && generation.originalUrl);
 }

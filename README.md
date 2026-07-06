@@ -64,7 +64,17 @@ cp .env.docker.example .env.docker
 ```bash
 APP_ENV="local"
 ADMIN_TOKEN="change-me"
+API_RATE_LIMIT_PUBLIC_MAX="120"
+API_RATE_LIMIT_PUBLIC_WINDOW_MS="60000"
+API_RATE_LIMIT_ADMIN_MAX="600"
+API_RATE_LIMIT_ADMIN_WINDOW_MS="60000"
+API_RATE_LIMIT_REDIS_FAILURE_MODE="fail-open"
 BOT_TOKEN=""
+BOT_ABUSE_GUARD_MAX="6"
+BOT_ABUSE_GUARD_WINDOW_MS="60000"
+BOT_ABUSE_GUARD_REDIS_TIMEOUT_MS="1000"
+BOT_ABUSE_GUARD_REDIS_FAILURE_MODE="fail-open"
+BOT_ABUSE_GUARD_MESSAGE="Слишком много запросов подряд. Подождите {seconds} сек. и попробуйте ещё раз."
 BOT_WEBHOOK_URL=""
 BOT_WEBHOOK_HOST="0.0.0.0"
 BOT_WEBHOOK_PORT="8080"
@@ -142,6 +152,36 @@ Do not use `VITE_ADMIN_TOKEN`. Frontend build variables are public in the
 browser bundle. `VITE_API_URL` is still safe to use because it is only the public
 admin API origin.
 
+## Abuse Protection
+
+The API uses Redis-backed fixed-window rate limits. `/health` is intentionally
+excluded for uptime probes; public routes such as `/ready` and payment callbacks
+use the public limit, while `/admin/*` and `/queues/*` use the admin limit. The
+default Redis failure mode is `fail-open`; set
+`API_RATE_LIMIT_REDIS_FAILURE_MODE="fail-closed"` if traffic should be rejected
+when Redis is unavailable.
+
+```bash
+API_RATE_LIMIT_PUBLIC_MAX="120"
+API_RATE_LIMIT_PUBLIC_WINDOW_MS="60000"
+API_RATE_LIMIT_ADMIN_MAX="600"
+API_RATE_LIMIT_ADMIN_WINDOW_MS="60000"
+API_RATE_LIMIT_REDIS_FAILURE_MODE="fail-open"
+```
+
+The Telegram bot rate-limits expensive actions per Telegram user, falling back
+to chat id when user id is unavailable. Normal menu navigation is not limited;
+source submission, media uploads, hook generation, and final generation share
+the same tunable window but use separate Redis keys per action scope.
+
+```bash
+BOT_ABUSE_GUARD_MAX="6"
+BOT_ABUSE_GUARD_WINDOW_MS="60000"
+BOT_ABUSE_GUARD_REDIS_TIMEOUT_MS="1000"
+BOT_ABUSE_GUARD_REDIS_FAILURE_MODE="fail-open"
+BOT_ABUSE_GUARD_MESSAGE="Слишком много запросов подряд. Подождите {seconds} сек. и попробуйте ещё раз."
+```
+
 ## Production Env Validation
 
 On startup, the API validates production env when `APP_ENV=production`, or when
@@ -197,6 +237,40 @@ In the Platega cabinet, set the transaction status callback URL to:
 https://your-api-domain.example/payments/platega/callback
 ```
 
+## Staging And Load Verification
+
+Use the production smoke script after a staging or production deploy. It checks
+the public health/readiness endpoints and the protected queue status endpoint
+with `ADMIN_TOKEN`; secrets are never printed.
+
+```bash
+API_BASE_URL="https://your-api-domain.example" ADMIN_TOKEN="..." npm run smoke:production
+```
+
+Optional Platega callback auth-negative smoke verifies that invalid callback
+credentials are rejected before any payment mutation can happen:
+
+```bash
+API_BASE_URL="https://your-api-domain.example" ADMIN_TOKEN="..." SMOKE_PLATEGA_CALLBACK=true npm run smoke:production
+```
+
+Use the load probe only against cheap GET endpoints. By default it probes
+`/health` and `/ready`; paths that look like generation, provider, payment, or
+webhook routes are blocked.
+
+```bash
+LOAD_BASE_URL="https://your-api-domain.example" LOAD_DURATION_SECONDS=30 LOAD_CONCURRENCY=4 LOAD_RPS=5 npm run load:probe
+```
+
+Useful load-probe variables:
+
+```bash
+LOAD_ENDPOINTS="/health,/ready"
+LOAD_TIMEOUT_MS="5000"
+LOAD_MAX_ERROR_RATE="0"
+LOAD_MAX_P95_MS=""
+```
+
 ## Telegram Bot Runtime
 
 By default the bot runs in long polling mode. This is the recommended local
@@ -224,6 +298,8 @@ KIE_POLL_INTERVAL_MS="3000"
 KIE_POLL_TIMEOUT_MS="900000"
 KIE_REQUEST_TIMEOUT_MS="120000"
 KIE_DOWNLOAD_TIMEOUT_MS="120000"
+REFERENCE_IMAGE_TIMEOUT_MS="30000"
+REFERENCE_IMAGE_MAX_BYTES="15728640"
 
 OPENROUTER_API_KEY=""
 OPENROUTER_MODEL="google/gemini-3.1-flash-image-preview"
@@ -263,6 +339,23 @@ FACE_CARD_WORKER_CONCURRENCY="2"
 FACE_CARD_WORKER_LIMIT_MAX="2"
 FACE_CARD_WORKER_LIMIT_DURATION_MS="10000"
 WORKER_LOCK_DURATION_MS="600000"
+```
+
+Protected ops endpoints:
+
+- `GET /queues/status` - queue counts and oldest job age.
+- `GET /ops/metrics` - process memory/uptime plus queue aggregates.
+- `GET /ops/alerts` - `ok/warn/critical` queue threshold report for deploy gates.
+
+Queue alert thresholds are configured with:
+
+```bash
+OPS_QUEUE_BACKLOG_WARN="20"
+OPS_QUEUE_BACKLOG_CRITICAL="100"
+OPS_QUEUE_OLDEST_JOB_WARN_MS="300000"
+OPS_QUEUE_OLDEST_JOB_CRITICAL_MS="900000"
+OPS_QUEUE_FAILED_WARN="1"
+OPS_QUEUE_FAILED_CRITICAL="10"
 ```
 
 Source ingestion uses this cascade:
