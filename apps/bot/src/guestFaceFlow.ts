@@ -1,6 +1,5 @@
 import {
   countUserFaceAssets,
-  createUserFaceAsset,
   findUserFaceAsset,
   getBillingAccess,
   listUserFaceAssets,
@@ -9,8 +8,9 @@ import {
   updateUserFaceAssetUrl,
   upsertTelegramUser
 } from "@covers/db";
+import { isGeneratedFaceCardMetadata } from "@covers/domain";
 import { avatarLimitMessage } from "./billingMessages.js";
-import { prepareFaceCard } from "./faceCardGenerator.js";
+import { createQueuedFaceAsset } from "./faceAssetUploads.js";
 import { sendFaceGallery } from "./faceGallery.js";
 import type { BotContext } from "./session.js";
 import { backHomeKeyboard } from "./sectionKeyboards.js";
@@ -79,18 +79,13 @@ export async function saveUploadedGuestFace(ctx: BotContext, token: string) {
   }
 
   const sourceImageUrl = telegramFileUrl(token, file.file_path);
-  const faceCard = await prepareFaceCard({
+  const face = await createQueuedFaceAsset({
     sourceImageUrl,
     telegramFilePath: file.file_path,
     userId: user.id,
-    telegramFileId: photo.file_id
-  });
-  const face = await createUserFaceAsset(prisma, {
-    userId: user.id,
-    imageUrl: faceCard.imageUrl,
     telegramFileId: photo.file_id,
     title: `Гость ${new Date().toLocaleDateString("ru-RU")}`,
-    metadata: { role: "guest-reference", ...faceCard.metadata }
+    role: "guest-reference"
   });
   await setProjectGuestFaceAsset(prisma, ctx.session.projectId, face.id);
   ctx.session.step = "idle";
@@ -117,7 +112,7 @@ async function refreshTelegramFaceUrl(
   face: { id: string; telegramFileId: string | null; imageUrl: string; metadata: unknown },
   token: string
 ) {
-  if (hasGeneratedFaceCard(face.metadata)) return face;
+  if (isGeneratedFaceCardMetadata(face.metadata)) return face;
   if (!face.telegramFileId) return face;
   const file = await ctx.api.getFile(face.telegramFileId);
   if (!file.file_path) return face;
@@ -126,13 +121,4 @@ async function refreshTelegramFaceUrl(
     sourceTelegramFilePath: file.file_path,
     refreshedAt: new Date().toISOString()
   });
-}
-
-function hasGeneratedFaceCard(metadata: unknown) {
-  return Boolean(
-    typeof metadata === "object" &&
-      metadata &&
-      "faceCardStatus" in metadata &&
-      metadata.faceCardStatus === "generated"
-  );
 }

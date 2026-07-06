@@ -1,4 +1,11 @@
-import { GENERATION_QUEUE, HOOK_QUEUE, type GenerationJobData, type HookJobData } from "@covers/domain";
+import {
+  FACE_CARD_QUEUE,
+  GENERATION_QUEUE,
+  HOOK_QUEUE,
+  type FaceCardJobData,
+  type GenerationJobData,
+  type HookJobData
+} from "@covers/domain";
 import { Queue, type DefaultJobOptions } from "bullmq";
 
 const redisUrl = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
@@ -40,12 +47,26 @@ export const hookQueue = new Queue<HookJobData, void, string>(HOOK_QUEUE, {
   defaultJobOptions
 });
 
+export const faceCardQueue = new Queue<FaceCardJobData, void, string>(FACE_CARD_QUEUE, {
+  connection: {
+    host: redisUrl.hostname,
+    port: Number(redisUrl.port || 6379),
+    password: redisUrl.password || undefined,
+    maxRetriesPerRequest: null
+  },
+  defaultJobOptions
+});
+
 export function hookJobId(projectId: string) {
   return `hooks-${safeJobIdPart(projectId)}`;
 }
 
 export function generationJobId(generationId: string) {
   return `generation-${safeJobIdPart(generationId)}`;
+}
+
+export function faceCardJobId(faceAssetId: string) {
+  return `face-card-${safeJobIdPart(faceAssetId)}`;
 }
 
 function safeJobIdPart(value: string) {

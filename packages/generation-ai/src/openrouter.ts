@@ -12,42 +12,56 @@ type OpenRouterMessage = {
   content: string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 };
 
+type OpenRouterRequestOptions = {
+  signal?: AbortSignal;
+};
+
 export class OpenRouterPromptPlanner {
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly timeoutMs: number;
 
-  constructor(config: { apiKey?: string; model?: string } = {}) {
+  constructor(config: { apiKey?: string; model?: string; timeoutMs?: number } = {}) {
     this.apiKey = config.apiKey ?? process.env.OPENROUTER_API_KEY ?? "";
     this.model = config.model ?? process.env.OPENROUTER_MODEL ?? "google/gemini-3.1-flash-image-preview";
+    this.timeoutMs = config.timeoutMs ?? positiveNumber(process.env.OPENROUTER_TIMEOUT_MS, 120000);
   }
 
-  async plan(input: PromptPlanningInput): Promise<PromptPlan> {
+  async plan(input: PromptPlanningInput, options: OpenRouterRequestOptions = {}): Promise<PromptPlan> {
     if (!this.apiKey) {
       return this.fallbackPlan(input);
     }
 
     const messages = this.messages(input);
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        "content-type": "application/json",
-        "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
-        "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+    const response = await fetchOpenRouterText(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          "content-type": "application/json",
+          "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
+          "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          temperature: 0.35,
+          response_format: { type: "json_object" }
+        })
       },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        temperature: 0.35,
-        response_format: { type: "json_object" }
-      })
-    });
+      {
+        description: "OpenRouter prompt planning",
+        signal: options.signal,
+        timeoutMs: this.timeoutMs
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`OpenRouter prompt planning failed: ${response.status} ${await response.text()}`);
+      throw new Error(`OpenRouter prompt planning failed: ${response.status} ${response.text}`);
     }
 
-    const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
     const content = json.choices?.[0]?.message?.content;
     if (!content) {
       throw new Error("OpenRouter returned an empty prompt plan.");
@@ -62,7 +76,7 @@ export class OpenRouterPromptPlanner {
     theme?: string;
     templateTitle?: string;
     templateRules?: string;
-  }): Promise<HookCandidate[]> {
+  }, options: OpenRouterRequestOptions = {}): Promise<HookCandidate[]> {
     const hookContext = buildHookContext({ transcript: input.transcript, theme: input.theme });
     const maxWords = deriveMaxHookWords(input.templateRules);
 
@@ -70,49 +84,57 @@ export class OpenRouterPromptPlanner {
       return this.fallbackHooks(hookContext, maxWords);
     }
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        "content-type": "application/json",
-        "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
-        "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+    const response = await fetchOpenRouterText(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          "content-type": "application/json",
+          "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
+          "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+        },
+        body: JSON.stringify({
+          model: this.model,
+          temperature: 0.55,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: "Ты редактор viral thumbnails. Пишешь короткие CTR-хуки для текста на обложке, не кликбейт-обман."
+            },
+            {
+              role: "user",
+              content: [
+                "Верни JSON: {\"hooks\":[{\"text\":\"...\",\"angle\":\"...\",\"score\":90}]}",
+                "Нужно 5 коротких русских hook-текстов для обложки.",
+                "До 5 слов, крупно читается в превью, усиливает конфликт/интригу.",
+                "Каждый хук должен опираться на конкретику из ролика: объект, цифру, цену, ошибку, контраст, результат или скрытую причину.",
+                "Не используй общие фразы без смысла: Я НЕ ОЖИДАЛ, ТАК НЕЛЬЗЯ, ВСЁ ИЗМЕНИЛОСЬ, ЭТО ВАЖНО, СМОТРИ ДО КОНЦА.",
+                "Подбирай CTR-механику под шаблон: contrast, mistake, hidden reason, deadline/countdown, metric, transformation, object proof.",
+                `Платформа: ${input.platform}.`,
+                `Тема: ${input.theme ?? "не указана"}.`,
+                `Шаблон: ${input.templateTitle ?? "не выбран"}.`,
+                `Правила шаблона: ${input.templateRules ?? "нет"}.`,
+                "Текст ролика:",
+                input.transcript.slice(0, 12000)
+              ].join("\n")
+            }
+          ]
+        })
       },
-      body: JSON.stringify({
-        model: this.model,
-        temperature: 0.55,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: "Ты редактор viral thumbnails. Пишешь короткие CTR-хуки для текста на обложке, не кликбейт-обман."
-          },
-          {
-            role: "user",
-            content: [
-              "Верни JSON: {\"hooks\":[{\"text\":\"...\",\"angle\":\"...\",\"score\":90}]}",
-              "Нужно 5 коротких русских hook-текстов для обложки.",
-              "До 5 слов, крупно читается в превью, усиливает конфликт/интригу.",
-              "Каждый хук должен опираться на конкретику из ролика: объект, цифру, цену, ошибку, контраст, результат или скрытую причину.",
-              "Не используй общие фразы без смысла: Я НЕ ОЖИДАЛ, ТАК НЕЛЬЗЯ, ВСЁ ИЗМЕНИЛОСЬ, ЭТО ВАЖНО, СМОТРИ ДО КОНЦА.",
-              "Подбирай CTR-механику под шаблон: contrast, mistake, hidden reason, deadline/countdown, metric, transformation, object proof.",
-              `Платформа: ${input.platform}.`,
-              `Тема: ${input.theme ?? "не указана"}.`,
-              `Шаблон: ${input.templateTitle ?? "не выбран"}.`,
-              `Правила шаблона: ${input.templateRules ?? "нет"}.`,
-              "Текст ролика:",
-              input.transcript.slice(0, 12000)
-            ].join("\n")
-          }
-        ]
-      })
-    });
+      {
+        description: "OpenRouter hook generation",
+        signal: options.signal,
+        timeoutMs: this.timeoutMs
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`OpenRouter hook generation failed: ${response.status} ${await response.text()}`);
+      throw new Error(`OpenRouter hook generation failed: ${response.status} ${response.text}`);
     }
 
-    const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
     const content = json.choices?.[0]?.message?.content;
     if (!content) return this.fallbackHooks(hookContext, maxWords);
 
@@ -257,4 +279,115 @@ export class OpenRouterPromptPlanner {
       validationIssues: validation.issues.length ? validation.issues : undefined
     };
   }
+}
+
+async function fetchOpenRouterText(
+  url: string,
+  init: RequestInit,
+  options: { description: string; signal?: AbortSignal; timeoutMs: number }
+): Promise<{ ok: boolean; status: number; text: string }> {
+  let lastResponse: { ok: boolean; status: number; text: string } | undefined;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await fetchTextWithTimeout(url, init, options);
+      if (response.ok || !isRetryableStatus(response.status) || attempt === 2) {
+        return response;
+      }
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+      if (options.signal?.aborted || isAbortError(error) || isTimeoutError(error) || attempt === 2) {
+        throw error;
+      }
+    }
+    await sleep(attempt * 250, options.signal);
+  }
+  if (lastResponse) return lastResponse;
+  throw lastError instanceof Error ? lastError : new Error(`${options.description} failed.`);
+}
+
+async function fetchTextWithTimeout(
+  url: string,
+  init: RequestInit,
+  options: { description: string; signal?: AbortSignal; timeoutMs: number }
+): Promise<{ ok: boolean; status: number; text: string }> {
+  return withTimeoutSignal(options, async (signal) => {
+    const response = await fetch(url, { ...init, signal });
+    return {
+      ok: response.ok,
+      status: response.status,
+      text: await response.text()
+    };
+  });
+}
+
+async function withTimeoutSignal<T>(
+  options: { description: string; signal?: AbortSignal; timeoutMs: number },
+  action: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs);
+  const abortFromParent = () => controller.abort(options.signal?.reason);
+
+  if (options.signal?.aborted) {
+    abortFromParent();
+  } else {
+    options.signal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
+  try {
+    return await action(controller.signal);
+  } catch (error) {
+    if (timedOut) {
+      throw new Error(`${options.description} timed out after ${options.timeoutMs}ms.`, { cause: error });
+    }
+    if (isAbortError(error) || options.signal?.aborted) {
+      throw new Error(`${options.description} was aborted.`, { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abortFromParent);
+  }
+}
+
+function positiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(" timed out after ");
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(new Error("OpenRouter request was aborted."));
+  }
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener("abort", abort);
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error("OpenRouter request was aborted."));
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
 }

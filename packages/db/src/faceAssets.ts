@@ -31,6 +31,10 @@ export async function findUserFaceAsset(db: DbClient, id: string, userId: string
   return db.userFaceAsset.findFirst({ where: { id, userId } });
 }
 
+export async function findUserFaceAssetById(db: DbClient, id: string) {
+  return db.userFaceAsset.findUnique({ where: { id } });
+}
+
 export async function updateUserFaceAssetUrl(db: DbClient, id: string, imageUrl: string, metadata?: object) {
   return db.userFaceAsset.update({
     where: { id },

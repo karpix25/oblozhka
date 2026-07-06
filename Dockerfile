@@ -19,9 +19,7 @@ RUN npm ci
 FROM deps AS build
 
 ARG VITE_API_URL=http://localhost:3000
-ARG VITE_ADMIN_TOKEN=
 ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_ADMIN_TOKEN=$VITE_ADMIN_TOKEN
 
 RUN npm run prisma:generate
 RUN npm run build

@@ -1,18 +1,21 @@
 import { detectSocialPlatform } from "./urlDetection.js";
+import { fetchTextWithTimeout, positiveNumber } from "./fetchWithTimeout.js";
 import type { TranscriptResult } from "./types.js";
 
 export class ScrapeCreatorsClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly language?: string;
+  private readonly timeoutMs: number;
 
-  constructor(config: { apiKey?: string; baseUrl?: string; language?: string } = {}) {
+  constructor(config: { apiKey?: string; baseUrl?: string; language?: string; timeoutMs?: number } = {}) {
     this.apiKey = config.apiKey ?? process.env.SCRAPECREATORS_API_KEY ?? "";
     this.baseUrl = (config.baseUrl ?? process.env.SCRAPECREATORS_BASE_URL ?? "https://api.scrapecreators.com").replace(/\/$/, "");
     this.language = (config.language ?? process.env.SCRAPECREATORS_TRANSCRIPT_LANGUAGE) || undefined;
+    this.timeoutMs = config.timeoutMs ?? positiveNumber(process.env.SCRAPECREATORS_TIMEOUT_MS, 60000);
   }
 
-  async transcriptFromUrl(url: string): Promise<TranscriptResult | undefined> {
+  async transcriptFromUrl(url: string, options: { signal?: AbortSignal } = {}): Promise<TranscriptResult | undefined> {
     if (!this.apiKey) return undefined;
 
     const platform = detectSocialPlatform(url);
@@ -25,16 +28,24 @@ export class ScrapeCreatorsClient {
       params.set("use_ai_as_fallback", process.env.SCRAPECREATORS_TIKTOK_AI_FALLBACK ?? "false");
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}?${params.toString()}`, {
-      headers: { "x-api-key": this.apiKey }
-    });
+    const response = await fetchTextWithTimeout(
+      `${this.baseUrl}${endpoint}?${params.toString()}`,
+      {
+        headers: { "x-api-key": this.apiKey }
+      },
+      {
+        description: "ScrapeCreators transcript",
+        signal: options.signal,
+        timeoutMs: this.timeoutMs
+      }
+    );
 
     if (response.status === 404) return undefined;
     if (!response.ok) {
-      throw new Error(`ScrapeCreators transcript failed: ${response.status} ${await response.text()}`);
+      throw new Error(`ScrapeCreators transcript failed: ${response.status} ${response.text}`);
     }
 
-    const raw = await response.json();
+    const raw = JSON.parse(response.text);
     const text = this.extractTranscript(raw);
     if (!text) return undefined;
 

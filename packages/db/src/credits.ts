@@ -33,6 +33,41 @@ export async function mutateCredits(db: DbClient, input: CreditMutation) {
   return db.$transaction((tx) => mutateCreditsInTransaction(tx, input));
 }
 
+export async function reversePurchasedCreditsInTransaction(
+  db: Prisma.TransactionClient,
+  input: { userId: string; amount: number; referenceId: string; note: string }
+) {
+  assertPositiveCredits(input.amount);
+
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: input.userId }
+  });
+  const balanceCreditsToRemove = Math.min(Math.max(0, user.balance), input.amount);
+  if (balanceCreditsToRemove > 0) {
+    const result = await db.user.updateMany({
+      where: {
+        id: input.userId,
+        balance: { gte: balanceCreditsToRemove }
+      },
+      data: { balance: { decrement: balanceCreditsToRemove } }
+    });
+
+    if (result.count !== 1) {
+      throw new Error("Purchased credits were already spent.");
+    }
+  }
+
+  return db.creditLedgerEntry.create({
+    data: {
+      userId: input.userId,
+      amount: -input.amount,
+      reason: "MANUAL_ADJUSTMENT",
+      referenceId: input.referenceId,
+      note: input.note
+    }
+  });
+}
+
 export async function debitGenerationCreditInTransaction(
   db: Prisma.TransactionClient,
   input: { userId: string; amount: number; referenceId: string; note: string }

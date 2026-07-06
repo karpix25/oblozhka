@@ -7,6 +7,7 @@ export type PlategaPaymentStatus =
   | "CONFIRMED"
   | "CANCELED"
   | "CHARGEBACKED"
+  | "REFUNDED"
   | "FAILED"
   | string;
 

@@ -4,6 +4,7 @@ type PlategaConfig = {
   baseUrl?: string;
   merchantId?: string;
   secret?: string;
+  timeoutMs?: number;
 };
 
 export type CreatePlategaTransactionInput = {
@@ -25,33 +26,44 @@ export class PlategaClient {
   private readonly baseUrl: string;
   private readonly merchantId: string;
   private readonly secret: string;
+  private readonly timeoutMs: number;
 
   constructor(config: PlategaConfig = {}) {
     this.baseUrl = config.baseUrl ?? process.env.PLATEGA_BASE_URL ?? DEFAULT_BASE_URL;
     this.merchantId = config.merchantId ?? process.env.PLATEGA_MERCHANT_ID ?? "";
     this.secret = config.secret ?? process.env.PLATEGA_SECRET ?? "";
+    this.timeoutMs = config.timeoutMs ?? positiveNumber(process.env.PLATEGA_TIMEOUT_MS, 30000);
   }
 
-  async createTransaction(input: CreatePlategaTransactionInput): Promise<PlategaTransaction> {
+  async createTransaction(input: CreatePlategaTransactionInput, options: { signal?: AbortSignal } = {}): Promise<PlategaTransaction> {
     this.assertConfigured();
     assertPositiveRubAmount(input.amountRub);
-    const response = await fetch(this.url("v2/transaction/process"), {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({
-        paymentDetails: {
-          amount: input.amountRub,
-          currency: RUB
-        },
-        description: input.description,
-        return: input.returnUrl,
-        failedUrl: input.failedUrl,
-        payload: input.payload,
-        metadata: input.metadata
-      })
-    });
+    const response = await fetchPlategaText(
+      this.url("v2/transaction/process"),
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({
+          paymentDetails: {
+            amount: input.amountRub,
+            currency: RUB
+          },
+          description: input.description,
+          return: input.returnUrl,
+          failedUrl: input.failedUrl,
+          payload: input.payload,
+          metadata: input.metadata
+        })
+      },
+      {
+        description: "Platega create transaction",
+        signal: options.signal,
+        timeoutMs: this.timeoutMs,
+        attempts: 1
+      }
+    );
 
-    const raw = await response.json().catch(async () => ({ error: await response.text() }));
+    const raw = parseJsonResponse(response.text);
     if (!response.ok) {
       throw new Error(`Platega create transaction failed: ${response.status} ${JSON.stringify(raw)}`);
     }
@@ -69,7 +81,6 @@ export class PlategaClient {
     if (!body.transactionId || !paymentUrl || !body.status) {
       throw new Error("Platega create transaction response is missing transactionId, status or payment URL.");
     }
-
     return {
       transactionId: body.transactionId,
       status: body.status,
@@ -80,17 +91,25 @@ export class PlategaClient {
     };
   }
 
-  async getTransaction(transactionId: string): Promise<PlategaTransactionStatus> {
+  async getTransaction(transactionId: string, options: { signal?: AbortSignal } = {}): Promise<PlategaTransactionStatus> {
     this.assertConfigured();
-    const response = await fetch(this.url(`transaction/${encodeURIComponent(transactionId)}`), {
-      method: "GET",
-      headers: this.headers()
-    });
-    const raw = await response.json().catch(async () => ({ error: await response.text() }));
+    const response = await fetchPlategaText(
+      this.url(`transaction/${encodeURIComponent(transactionId)}`),
+      {
+        method: "GET",
+        headers: this.headers()
+      },
+      {
+        description: "Platega status check",
+        signal: options.signal,
+        timeoutMs: this.timeoutMs,
+        attempts: 2
+      }
+    );
+    const raw = parseJsonResponse(response.text);
     if (!response.ok) {
       throw new Error(`Platega status check failed: ${response.status} ${JSON.stringify(raw)}`);
     }
-
     return normalizePlategaStatus(raw);
   }
 
@@ -159,4 +178,123 @@ function assertPositiveRubAmount(amount: number) {
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new Error("Platega amountRub must be a positive integer.");
   }
+}
+
+async function fetchPlategaText(
+  url: string,
+  init: RequestInit,
+  options: { description: string; signal?: AbortSignal; timeoutMs: number; attempts: number }
+): Promise<{ ok: boolean; status: number; text: string }> {
+  let lastResponse: { ok: boolean; status: number; text: string } | undefined;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= options.attempts; attempt += 1) {
+    try {
+      const response = await fetchTextWithTimeout(url, init, options);
+      if (response.ok || !isRetryableStatus(response.status) || attempt === options.attempts) {
+        return response;
+      }
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+      if (options.signal?.aborted || isAbortError(error) || isTimeoutError(error) || attempt === options.attempts) {
+        throw error;
+      }
+    }
+    await sleep(attempt * 250, options.signal);
+  }
+  if (lastResponse) return lastResponse;
+  throw lastError instanceof Error ? lastError : new Error(`${options.description} failed.`);
+}
+
+function fetchTextWithTimeout(
+  url: string,
+  init: RequestInit,
+  options: { description: string; signal?: AbortSignal; timeoutMs: number }
+): Promise<{ ok: boolean; status: number; text: string }> {
+  return withTimeoutSignal(options, async (signal) => {
+    const response = await fetch(url, { ...init, signal });
+    return {
+      ok: response.ok,
+      status: response.status,
+      text: await response.text()
+    };
+  });
+}
+
+function withTimeoutSignal<T>(
+  options: { description: string; signal?: AbortSignal; timeoutMs: number },
+  action: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs);
+  const abortFromParent = () => controller.abort(options.signal?.reason);
+
+  if (options.signal?.aborted) {
+    abortFromParent();
+  } else {
+    options.signal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
+  return action(controller.signal)
+    .catch((error) => {
+      if (timedOut) {
+        throw new Error(`${options.description} timed out after ${options.timeoutMs}ms.`, { cause: error });
+      }
+      if (isAbortError(error) || options.signal?.aborted) {
+        throw new Error(`${options.description} was aborted.`, { cause: error });
+      }
+      throw error;
+    })
+    .finally(() => {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", abortFromParent);
+    });
+}
+
+function parseJsonResponse(text: string): unknown {
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { error: text };
+  }
+}
+
+function positiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(" timed out after ");
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(new Error("Platega request was aborted."));
+  }
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener("abort", abort);
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error("Platega request was aborted."));
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
 }

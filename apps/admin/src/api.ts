@@ -1,17 +1,16 @@
 import type { CreditPackage, Generation, Payment, PromptPreset, User } from "./types.js";
+import { readAdminToken } from "./adminToken.js";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:3000";
 
-function token() {
-  return localStorage.getItem("adminToken") ?? import.meta.env.VITE_ADMIN_TOKEN ?? "";
-}
+export { readAdminToken, saveToken } from "./adminToken.js";
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${apiUrl}/admin${path}`, {
     ...init,
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${token()}`,
+      authorization: `Bearer ${readAdminToken()}`,
       ...init.headers
     }
   });
@@ -21,10 +20,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   return response.json() as Promise<T>;
-}
-
-export function saveToken(value: string) {
-  localStorage.setItem("adminToken", value);
 }
 
 export const adminApi = {

@@ -80,6 +80,20 @@ export async function activateSubscriptionInTransaction(
   });
 }
 
+export async function cancelSubscriptionsForPaymentInTransaction(
+  db: Prisma.TransactionClient,
+  input: { userId: string; sourcePaymentId: string }
+) {
+  return db.userSubscription.updateMany({
+    where: {
+      userId: input.userId,
+      sourcePaymentId: input.sourcePaymentId,
+      status: "ACTIVE"
+    },
+    data: { status: "CANCELED" }
+  });
+}
+
 export async function listActiveSubscriptions(db: DbClient) {
   return db.userSubscription.findMany({
     include: { user: true, sourcePayment: true },

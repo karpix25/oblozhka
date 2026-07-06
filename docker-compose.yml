@@ -42,7 +42,6 @@ services:
       context: .
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-        VITE_ADMIN_TOKEN: ${VITE_ADMIN_TOKEN:-}
     image: hookcover-app:local
     restart: unless-stopped
     env_file:
@@ -74,7 +73,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
         ]
       interval: 10s
       timeout: 5s
@@ -102,6 +101,17 @@ services:
       api:
         condition: service_healthy
     command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/worker", "run", "start"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const cmd=require('node:fs').readFileSync('/proc/1/cmdline','utf8');process.exit(cmd.includes('@covers/worker')?0:1)"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   bot:
     image: hookcover-app:local
@@ -125,6 +135,17 @@ services:
       api:
         condition: service_healthy
     command: ["node", "scripts/run-with-database-url.mjs", "npm", "--workspace", "@covers/bot", "run", "start"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const cmd=require('node:fs').readFileSync('/proc/1/cmdline','utf8');process.exit(cmd.includes('@covers/bot')?0:1)"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   admin:
     image: hookcover-app:local

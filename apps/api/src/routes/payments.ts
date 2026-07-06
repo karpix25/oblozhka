@@ -28,13 +28,14 @@ export async function plategaPaymentRoutes(app: FastifyInstance) {
       return { ok: true };
     }
 
-    if (payment.status === "CANCELED" || payment.status === "FAILED" || payment.status === "CHARGEBACKED") {
+    const notSuccessfulStatus = plategaNotSuccessfulStatus(payment.status);
+    if (notSuccessfulStatus) {
       await markPlategaPaymentNotSuccessful(prisma, {
         providerTransactionId: payment.id,
         providerStatus: payment.status,
         amountRub: payment.amount,
         currency: payment.currency,
-        status: payment.status === "CHARGEBACKED" ? "CHARGEBACKED" : payment.status === "CANCELED" ? "CANCELED" : "FAILED",
+        status: notSuccessfulStatus,
         raw: payment.raw as object
       });
     }
@@ -45,4 +46,11 @@ export async function plategaPaymentRoutes(app: FastifyInstance) {
 
 function headerValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function plategaNotSuccessfulStatus(status: string) {
+  if (status === "CHARGEBACKED" || status === "REFUNDED" || status === "CANCELED" || status === "FAILED") {
+    return status;
+  }
+  return null;
 }

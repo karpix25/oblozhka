@@ -7,18 +7,18 @@ export class SourceIngestionService {
   private readonly scrapeCreators = new ScrapeCreatorsClient();
   private readonly deepgram = new DeepgramTranscriptionClient();
 
-  async resolveTranscript(input: { sourceType: SourceType; url?: string; text?: string }) {
+  async resolveTranscript(input: { sourceType: SourceType; url?: string; text?: string }, options: { signal?: AbortSignal } = {}) {
     if (input.sourceType === "TRANSCRIPT" && input.text) {
       return { text: input.text, provider: "user", raw: { sourceType: input.sourceType } } satisfies TranscriptResult;
     }
 
     if (input.sourceType === "LINK" && input.url) {
-      const socialTranscript = await this.scrapeCreators.transcriptFromUrl(input.url);
+      const socialTranscript = await this.scrapeCreators.transcriptFromUrl(input.url, options);
       if (socialTranscript) return socialTranscript;
     }
 
     if (input.url) {
-      return this.deepgram.transcribeUrl(input.url);
+      return this.deepgram.transcribeUrl(input.url, options);
     }
 
     return undefined;

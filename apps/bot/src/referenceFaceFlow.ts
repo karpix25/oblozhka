@@ -1,6 +1,5 @@
 import {
   countUserFaceAssets,
-  createUserFaceAsset,
   findProject,
   findUserFaceAsset,
   getBillingAccess,
@@ -9,8 +8,9 @@ import {
   updateUserFaceAssetUrl,
   upsertTelegramUser
 } from "@covers/db";
+import { isGeneratedFaceCardMetadata } from "@covers/domain";
 import { avatarLimitMessage } from "./billingMessages.js";
-import { prepareFaceCard } from "./faceCardGenerator.js";
+import { createQueuedFaceAsset } from "./faceAssetUploads.js";
 import { sendFaceGallery } from "./faceGallery.js";
 import { referenceForGenerationPrompt } from "./messages.js";
 import { backHomeKeyboard } from "./sectionKeyboards.js";
@@ -70,25 +70,17 @@ export async function saveUploadedReferenceFace(
   }
 
   const sourceImageUrl = telegramFileUrl(input.token, input.filePath);
-  const faceCard = await prepareFaceCard({
+  const face = await createQueuedFaceAsset({
     sourceImageUrl,
     telegramFilePath: input.filePath,
     userId: user.id,
-    telegramFileId: input.photo.file_id
-  });
-  await createUserFaceAsset(prisma, {
-    userId: user.id,
-    imageUrl: faceCard.imageUrl,
     telegramFileId: input.photo.file_id,
     title: `Аватар ${new Date().toLocaleDateString("ru-RU")}`,
-    metadata: {
-      role: "primary-reference",
-      projectId: ctx.session.projectId,
-      ...faceCard.metadata
-    }
+    role: "primary-reference",
+    projectId: ctx.session.projectId
   });
 
-  return faceCard;
+  return face;
 }
 
 async function refreshTelegramFaceUrl(
@@ -96,7 +88,7 @@ async function refreshTelegramFaceUrl(
   face: { id: string; telegramFileId: string | null; imageUrl: string; metadata: unknown },
   token: string
 ) {
-  if (hasGeneratedFaceCard(face.metadata)) return face;
+  if (isGeneratedFaceCardMetadata(face.metadata)) return face;
   if (!face.telegramFileId) return face;
   const file = await ctx.api.getFile(face.telegramFileId);
   if (!file.file_path) return face;
@@ -109,13 +101,4 @@ async function refreshTelegramFaceUrl(
 
 function telegramFileUrl(token: string, filePath: string) {
   return `https://api.telegram.org/file/bot${token}/${filePath}`;
-}
-
-function hasGeneratedFaceCard(metadata: unknown) {
-  return Boolean(
-    typeof metadata === "object" &&
-      metadata &&
-      "faceCardStatus" in metadata &&
-      metadata.faceCardStatus === "generated"
-  );
 }

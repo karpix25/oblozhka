@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { registerAdminAuth } from "./auth.js";
+import { validateProductionEnv } from "./env.js";
 import { generationRoutes } from "./routes/generations.js";
 import { healthRoutes } from "./routes/health.js";
 import { hookRoutes } from "./routes/hooks.js";
@@ -8,15 +9,19 @@ import { packageRoutes } from "./routes/packages.js";
 import { paymentRoutes, plategaPaymentRoutes } from "./routes/payments.js";
 import { presetRoutes } from "./routes/presets.js";
 import { projectRoutes } from "./routes/projects.js";
+import { queueRoutes } from "./routes/queues.js";
 import { templateRoutes } from "./routes/templates.js";
 import { userRoutes } from "./routes/users.js";
+
+validateProductionEnv();
 
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
-await registerAdminAuth(app);
 await app.register(healthRoutes);
+await registerAdminAuth(app);
 await app.register(plategaPaymentRoutes);
+await app.register(queueRoutes);
 await app.register(userRoutes, { prefix: "/admin" });
 await app.register(packageRoutes, { prefix: "/admin" });
 await app.register(paymentRoutes, { prefix: "/admin" });

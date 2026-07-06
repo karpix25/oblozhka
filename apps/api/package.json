@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@covers/db": "0.1.0",
+    "@covers/domain": "0.1.0",
     "@covers/payments": "0.1.0",
     "@fastify/cors": "^10.0.2",
-    "fastify": "^5.1.0"
+    "fastify": "^5.1.0",
+    "ioredis": "^5.4.2"
   }
 }

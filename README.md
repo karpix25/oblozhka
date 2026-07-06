@@ -23,7 +23,7 @@ unlimited monthly credits. Unused monthly credits do not roll over.
 
 ## Apps
 
-- `apps/bot` - Telegram bot, wizard, Stars payments.
+- `apps/bot` - Telegram bot, wizard, Platega checkout handoff.
 - `apps/api` - Fastify admin API.
 - `apps/admin` - React admin panel.
 - `apps/worker` - BullMQ generation worker.
@@ -35,7 +35,7 @@ unlimited monthly credits. Unused monthly credits do not roll over.
 - `packages/generation-ai` - Kie.ai image generation and OpenRouter prompt planning.
 - `packages/openai-image` - legacy OpenAI Images adapter kept for optional fallback work.
 - `packages/storage` - S3-compatible storage adapter.
-- `packages/telegram-payments` - Telegram Stars invoice helpers.
+- `packages/payments` - Platega RUB transaction helpers.
 
 ## Local Setup
 
@@ -62,6 +62,8 @@ cp .env.docker.example .env.docker
 2. Fill the required keys in `.env.docker`:
 
 ```bash
+APP_ENV="local"
+ADMIN_TOKEN="change-me"
 BOT_TOKEN=""
 BOT_WEBHOOK_URL=""
 BOT_WEBHOOK_HOST="0.0.0.0"
@@ -95,6 +97,10 @@ The stack includes:
 - `worker`
 - `bot`
 
+The local Docker example uses `APP_ENV=local`, so empty provider keys remain
+convenient while you are wiring services. For any real deployment, set
+`APP_ENV=production` and fill the production env listed below.
+
 The API container applies versioned Prisma migrations before starting with
 `prisma migrate deploy`. This is the production-safe default and does not use
 `prisma db push --accept-data-loss`.
@@ -125,6 +131,52 @@ docker compose down -v
 Use `docker compose down -v` only when you want to delete local Postgres and
 Redis data.
 
+## Admin Security
+
+`ADMIN_TOKEN` is a server-side secret used by the Fastify admin API. The React
+admin panel does not embed this token at build time. Open the admin panel, click
+`Token`, and paste the current server token; it is stored in browser
+`localStorage` for that browser only.
+
+Do not use `VITE_ADMIN_TOKEN`. Frontend build variables are public in the
+browser bundle. `VITE_API_URL` is still safe to use because it is only the public
+admin API origin.
+
+## Production Env Validation
+
+On startup, the API validates production env when `APP_ENV=production`, or when
+`NODE_ENV=production` and no `APP_ENV`/`DEPLOY_ENV` override is set. Local
+examples use `APP_ENV=local` so development remains easy.
+
+Production requires these values to be present:
+
+```bash
+APP_ENV="production"
+ADMIN_TOKEN="strong-secret-not-change-me"
+BOT_TOKEN="..."
+DATABASE_URL="postgresql://..."
+REDIS_URL="redis://..."
+PLATEGA_BASE_URL="https://app.platega.io/"
+PLATEGA_MERCHANT_ID="..."
+PLATEGA_SECRET="..."
+PAYMENT_RETURN_URL="https://t.me/karpix_oblozhka_bot"
+KIE_API_KEY="..."
+KIE_BASE_URL="https://api.kie.ai"
+KIE_IMAGE_MODEL="gpt-image-2-image-to-image"
+OPENROUTER_API_KEY="..."
+OPENROUTER_MODEL="google/gemini-3.1-flash-image-preview"
+SCRAPECREATORS_API_KEY="..."
+SCRAPECREATORS_BASE_URL="https://api.scrapecreators.com"
+DEEPGRAM_API_KEY="..."
+DEEPGRAM_MODEL="nova-3"
+S3_ENDPOINT="..."
+S3_REGION="auto"
+S3_BUCKET="..."
+S3_ACCESS_KEY_ID="..."
+S3_SECRET_ACCESS_KEY="..."
+S3_PUBLIC_BASE_URL="https://..."
+```
+
 Payments use Platega RUB transactions. Credits or subscriptions are granted only
 after Platega reports a confirmed transaction, and payment completion is
 idempotent so duplicate callbacks do not grant access twice.
@@ -135,6 +187,7 @@ Configure these Platega environment variables in production:
 PLATEGA_BASE_URL="https://app.platega.io/"
 PLATEGA_MERCHANT_ID="..."
 PLATEGA_SECRET="..."
+PLATEGA_TIMEOUT_MS="30000"
 PAYMENT_RETURN_URL="https://t.me/karpix_oblozhka_bot"
 ```
 
@@ -169,22 +222,48 @@ KIE_BASE_URL="https://api.kie.ai"
 KIE_IMAGE_MODEL="gpt-image-2-image-to-image"
 KIE_POLL_INTERVAL_MS="3000"
 KIE_POLL_TIMEOUT_MS="900000"
+KIE_REQUEST_TIMEOUT_MS="120000"
+KIE_DOWNLOAD_TIMEOUT_MS="120000"
 
 OPENROUTER_API_KEY=""
 OPENROUTER_MODEL="google/gemini-3.1-flash-image-preview"
+OPENROUTER_TIMEOUT_MS="120000"
 
 SCRAPECREATORS_API_KEY=""
 SCRAPECREATORS_BASE_URL="https://api.scrapecreators.com"
 SCRAPECREATORS_TRANSCRIPT_LANGUAGE=""
 SCRAPECREATORS_TIKTOK_AI_FALLBACK="false"
+SCRAPECREATORS_TIMEOUT_MS="60000"
 
 DEEPGRAM_API_KEY=""
 DEEPGRAM_MODEL="nova-3"
 DEEPGRAM_LANGUAGE=""
+DEEPGRAM_TIMEOUT_MS="120000"
 ```
 
 Kie.ai tasks are asynchronous: the worker creates a task, polls
 `/api/v1/jobs/recordInfo`, downloads the result immediately, and stores it in S3.
+
+## Worker Queues And Timeouts
+
+The worker uses separate queues for image generation, hook generation, and
+background face-card preparation. User photo uploads store the source image
+immediately, enqueue `face-card-generation`, and do not block the Telegram
+handler while Kie prepares a reusable face card.
+
+Useful production tuning variables:
+
+```bash
+GENERATION_JOB_TIMEOUT_MS="1200000"
+HOOK_JOB_TIMEOUT_MS="600000"
+FACE_CARD_JOB_TIMEOUT_MS="300000"
+GENERATION_WORKER_CONCURRENCY="2"
+HOOK_WORKER_CONCURRENCY="4"
+FACE_CARD_WORKER_CONCURRENCY="2"
+FACE_CARD_WORKER_LIMIT_MAX="2"
+FACE_CARD_WORKER_LIMIT_DURATION_MS="10000"
+WORKER_LOCK_DURATION_MS="600000"
+```
 
 Source ingestion uses this cascade:
 

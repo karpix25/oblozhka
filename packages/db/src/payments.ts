@@ -1,6 +1,7 @@
 import type { PaymentStatus, Prisma } from "@prisma/client";
 import type { DbClient } from "./client.js";
-import { activateSubscriptionInTransaction } from "./subscriptions.js";
+import { reversePurchasedCreditsInTransaction } from "./credits.js";
+import { activateSubscriptionInTransaction, cancelSubscriptionsForPaymentInTransaction } from "./subscriptions.js";
 
 export type PendingPlategaPaymentInput = {
   userId: string;
@@ -24,6 +25,17 @@ export type PlategaPaymentUpdate = {
 };
 
 type PaymentTransaction = Prisma.TransactionClient;
+type PaymentReversalStatus = Extract<PaymentStatus, "CHARGEBACKED" | "REFUNDED">;
+type NotSuccessfulPaymentStatus = Extract<PaymentStatus, "FAILED" | "CANCELED"> | PaymentReversalStatus;
+type PaymentWithPackage = {
+  id: string;
+  userId: string;
+  amountRub: number;
+  currency: string;
+  status: PaymentStatus;
+  creditsGranted: number;
+  package: { plan: string | null } | null;
+};
 
 export async function createPendingPlategaPayment(db: DbClient, input: PendingPlategaPaymentInput) {
   return db.payment.upsert({
@@ -100,19 +112,28 @@ export async function completePlategaPayment(db: DbClient, input: PlategaPayment
 
 export async function markPlategaPaymentNotSuccessful(
   db: DbClient,
-  input: PlategaPaymentUpdate & { status: Extract<PaymentStatus, "FAILED" | "CANCELED" | "CHARGEBACKED"> }
+  input: PlategaPaymentUpdate & { status: NotSuccessfulPaymentStatus }
 ) {
   return db.$transaction(async (tx) => {
     const existing = await tx.payment.findUnique({
-      where: { providerTransactionId: input.providerTransactionId }
+      where: { providerTransactionId: input.providerTransactionId },
+      include: { package: true }
     });
     if (!existing) {
       throw new Error("Payment was not found for Platega transaction.");
     }
+    assertPaymentMatches(existing, input);
+
     if (existing.status === "SUCCEEDED") {
+      if (isPaymentReversalStatus(input.status)) {
+        return reverseSucceededPayment(tx, existing, { ...input, status: input.status });
+      }
       return existing;
     }
-    assertPaymentMatches(existing, input);
+
+    if (isPaymentReversalStatus(existing.status)) {
+      return existing;
+    }
 
     const updateResult = await tx.payment.updateMany({
       where: { id: existing.id, status: { not: "SUCCEEDED" } },
@@ -185,6 +206,61 @@ async function findSucceededPayment(tx: PaymentTransaction, paymentId: string) {
   return payment;
 }
 
+async function reverseSucceededPayment(
+  tx: PaymentTransaction,
+  existing: PaymentWithPackage,
+  input: PlategaPaymentUpdate & { status: PaymentReversalStatus }
+) {
+  const payment = await claimPlategaPaymentReversal(tx, existing.id, input);
+  if (!payment) {
+    return findPaymentById(tx, existing.id);
+  }
+
+  if (existing.package?.plan) {
+    await cancelSubscriptionsForPaymentInTransaction(tx, {
+      userId: existing.userId,
+      sourcePaymentId: payment.id
+    });
+    return payment;
+  }
+
+  if (payment.creditsGranted > 0) {
+    await reversePurchasedCreditsInTransaction(tx, {
+      userId: payment.userId,
+      amount: payment.creditsGranted,
+      referenceId: payment.id,
+      note: `${input.status} payment reversal`
+    });
+  }
+
+  return payment;
+}
+
+async function claimPlategaPaymentReversal(
+  tx: PaymentTransaction,
+  paymentId: string,
+  input: PlategaPaymentUpdate & { status: PaymentReversalStatus }
+) {
+  const updateResult = await tx.payment.updateMany({
+    where: { id: paymentId, status: "SUCCEEDED" },
+    data: {
+      status: input.status,
+      providerStatus: input.providerStatus,
+      failedAt: new Date(),
+      raw: input.raw
+    }
+  });
+
+  if (updateResult.count === 0) {
+    return null;
+  }
+  return findPaymentById(tx, paymentId);
+}
+
 async function findPaymentById(tx: PaymentTransaction, paymentId: string) {
   return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+}
+
+function isPaymentReversalStatus(status: PaymentStatus): status is PaymentReversalStatus {
+  return status === "CHARGEBACKED" || status === "REFUNDED";
 }

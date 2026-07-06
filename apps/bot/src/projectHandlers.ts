@@ -295,12 +295,12 @@ export async function handleProjectPhoto(ctx: BotContext, token: string) {
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const imageUrl = telegramFileUrl(token, file.file_path);
-  await ctx.reply("Принял фото. Сначала собираю карту лица для стабильного аватара.");
-  const faceCard = await saveUploadedReferenceFace(ctx, { token, photo, filePath: file.file_path });
-  if (faceCard === false) {
+  await ctx.reply("Принял фото. Сохраняю лицо, а улучшенную карту лица подготовлю в фоне.");
+  const face = await saveUploadedReferenceFace(ctx, { token, photo, filePath: file.file_path });
+  if (face === false) {
     return true;
   }
-  if (await createAndEnqueueProjectGeneration(ctx, { userId: user.id, referenceImageUrl: faceCard?.imageUrl ?? imageUrl })) {
+  if (await createAndEnqueueProjectGeneration(ctx, { userId: user.id, referenceImageUrl: face?.imageUrl ?? imageUrl })) {
     resetWizard(ctx);
     await ctx.reply("Аватар сохранён. Собираю обложку в выбранном стиле.");
   }
