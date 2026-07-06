@@ -6,20 +6,11 @@ import { sourceTypeKeyboard } from "./keyboards.js";
 import { sourceStartMessage } from "./messages.js";
 import { sendProjectList } from "./projectList.js";
 import { balanceKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
+import { menuIntentFromText } from "./menuIntent.js";
 import { resetWizard, type BotContext } from "./session.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
-
-const legacyMenuLabels = {
-  create: "🎨 Создать",
-  templates: "🖼 Шаблоны",
-  faces: "👤 Лица",
-  projects: "📁 Проекты",
-  tariffs: "💳 Тарифы",
-  documents: "📄 Документы",
-  balance: "💎 Баланс",
-  help: "❓ Помощь"
-} as const;
+import { openStyleLibrary } from "./styleLibrary.js";
 
 const removeReplyKeyboard = { remove_keyboard: true } as const;
 
@@ -31,40 +22,45 @@ export async function hideReplyMenu(ctx: BotContext) {
 }
 
 export async function handleLegacyReplyMenuText(ctx: BotContext) {
-  const text = ctx.message?.text?.trim();
-  if (!text || !(Object.values(legacyMenuLabels) as string[]).includes(text)) {
+  const intent = menuIntentFromText(ctx.message?.text);
+  if (!intent) {
     return false;
   }
 
-  if (text === legacyMenuLabels.create) {
+  if (intent === "create") {
     resetWizard(ctx);
     await ctx.reply(sourceStartMessage(), { reply_markup: sourceTypeKeyboard() });
     return true;
   }
 
-  if (text === legacyMenuLabels.templates) {
+  if (intent === "templates") {
     ctx.session.templateGalleryMode = "browse";
     const templates = await listTemplates(prisma, "YOUTUBE");
     await sendTemplateGallery(ctx, templates, { mode: "browse", platform: "YOUTUBE" });
     return true;
   }
 
-  if (text === legacyMenuLabels.faces) {
+  if (intent === "faces") {
     await openFaceLibrary(ctx);
     return true;
   }
 
-  if (text === legacyMenuLabels.projects) {
+  if (intent === "styles") {
+    await openStyleLibrary(ctx);
+    return true;
+  }
+
+  if (intent === "projects") {
     await sendProjectList(ctx);
     return true;
   }
 
-  if (text === legacyMenuLabels.tariffs) {
+  if (intent === "tariffs") {
     await ctx.reply(tariffsMessage(), { reply_markup: tariffsKeyboard() });
     return true;
   }
 
-  if (text === legacyMenuLabels.documents || text === legacyMenuLabels.help) {
+  if (intent === "documents" || intent === "help") {
     await ctx.reply(supportMessage(), { reply_markup: documentsKeyboard() });
     return true;
   }

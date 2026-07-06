@@ -148,11 +148,11 @@ export class OpenRouterPromptPlanner {
           input.wizard.guestReferenceImageUrl
             ? "Есть второй человек/гость. Используй его как отдельное лицо второго участника, особенно для podcast/podcast countdown композиций."
             : "Второго лица/гостя нет.",
-          "Сохрани композиционный скелет выбранного шаблона: расположение лица/объекта, зоны текста, крупность, глубину, направление взгляда/объекта, цветовую иерархию и характер шрифта.",
+          "Сохрани композиционный скелет выбранного шаблона или пользовательского стиля: расположение лица/объекта, зоны текста, крупность, глубину, направление взгляда/объекта, цветовую иерархию и характер шрифта.",
           "Промпт должен явно описать layout zones, typography/font feel, text placement, subject/object placement, foreground/background depth, color accents.",
           "Не копируй чужой дизайн один-в-один. Бери только композицию, настроение, контраст и читаемость.",
           "Промпт должен требовать крупный фокусный объект, чистую композицию, русский текст без ошибок, коммерческий thumbnail-look.",
-          "Запрещено менять выбранный шаблон на другой формат композиции."
+          "Запрещено менять выбранный стиль на другой формат композиции."
         ].join("\n")
       }
     ];
@@ -165,6 +165,9 @@ export class OpenRouterPromptPlanner {
     }
     if (input.templateReferenceImageUrl) {
       userContent.push({ type: "image_url", image_url: { url: input.templateReferenceImageUrl } });
+    }
+    if (input.userStyle?.imageUrl) {
+      userContent.push({ type: "image_url", image_url: { url: input.userStyle.imageUrl } });
     }
 
     return [
@@ -192,7 +195,13 @@ export class OpenRouterPromptPlanner {
     const faceRule = input.wizard.referenceMode === "FACE"
       ? "Use the uploaded face photo as identity reference; keep the person recognizable, flattering and expressive."
       : "Create an original thumbnail composition; do not copy any third-party design exactly.";
-    const templateRule = input.template?.promptRules
+    const templateRule = input.userStyle?.promptRules
+      ? [
+          `Mandatory custom user style: ${input.userStyle.title ?? input.wizard.style}.`,
+          `Custom style rules: ${input.userStyle.promptRules}.`,
+          "Use the custom style reference as style only: composition rhythm, colors, typography feel and text zones. Do not copy exact content."
+        ].join(" ")
+      : input.template?.promptRules
       ? [
           `Mandatory template: ${input.template.title ?? input.wizard.style}.`,
           `Template rules: ${input.template.promptRules}.`,
@@ -217,6 +226,15 @@ export class OpenRouterPromptPlanner {
   }
 
   private templateGuide(input: PromptPlanningInput) {
+    if (input.userStyle) {
+      return [
+        `Выбран пользовательский стиль: ${input.userStyle.title ?? input.wizard.style}.`,
+        `Правила пользовательского стиля:\n${input.userStyle.promptRules ?? "Use the uploaded style reference as a style guide."}`,
+        "Картинка пользовательского стиля является style reference: брать композиционный ритм, контраст, цветовую палитру, характер типографики и зоны текста.",
+        "Не копировать точный контент, лица, бренды, логотипы и текст из style reference."
+      ].join("\n");
+    }
+
     const templateName = input.template?.title ?? input.wizard.style;
     const templateSlug = input.template?.slug ?? input.wizard.templateSlug ?? "unknown";
     const rules = input.template?.promptRules?.trim() || "No saved template rules. Infer from the selected style title.";

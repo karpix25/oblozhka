@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 export async function registerAdminAuth(app: FastifyInstance) {
   app.addHook("preHandler", async (request, reply) => {
-    if (request.url === "/health") {
+    if (request.url === "/health" || request.url === "/payments/platega/callback") {
       return;
     }
     await requireAdminToken(request, reply);

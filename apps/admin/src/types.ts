@@ -14,7 +14,7 @@ export type CreditPackage = {
   plan?: "START" | "PRO" | "BUSINESS";
   title: string;
   description?: string;
-  starsPrice: number;
+  priceRub: number;
   credits: number;
   isActive: boolean;
 };
@@ -22,9 +22,12 @@ export type CreditPackage = {
 export type Payment = {
   id: string;
   status: string;
-  starsAmount: number;
+  amountRub: number;
+  currency: string;
+  providerTransactionId?: string;
+  providerStatus?: string;
+  paymentUrl?: string;
   creditsGranted: number;
-  telegramPaymentChargeId?: string;
   createdAt: string;
   user?: User;
   package?: CreditPackage;

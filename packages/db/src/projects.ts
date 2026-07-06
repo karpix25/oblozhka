@@ -50,8 +50,16 @@ export async function setProjectPlatform(db: DbClient, projectId: string, platfo
 export async function setProjectTemplate(db: DbClient, projectId: string, templateId: string) {
   return db.project.update({
     where: { id: projectId },
-    data: { selectedTemplateId: templateId },
-    include: { selectedTemplate: true, sourceAssets: true, transcripts: true }
+    data: { selectedTemplateId: templateId, selectedUserStyleAssetId: null, styleSource: "LIBRARY_TEMPLATE" },
+    include: { selectedTemplate: true, selectedUserStyleAsset: true, sourceAssets: true, transcripts: true }
+  });
+}
+
+export async function setProjectUserStyleAsset(db: DbClient, projectId: string, userStyleAssetId: string) {
+  return db.project.update({
+    where: { id: projectId },
+    data: { selectedUserStyleAssetId: userStyleAssetId, selectedTemplateId: null, styleSource: "USER_STYLE" },
+    include: { selectedTemplate: true, selectedUserStyleAsset: true, sourceAssets: true, transcripts: true }
   });
 }
 
@@ -59,7 +67,7 @@ export async function setProjectGuestFaceAsset(db: DbClient, projectId: string, 
   return db.project.update({
     where: { id: projectId },
     data: { guestFaceAssetId },
-    include: { guestFaceAsset: true, selectedTemplate: true }
+    include: { guestFaceAsset: true, selectedTemplate: true, selectedUserStyleAsset: true }
   });
 }
 
@@ -79,6 +87,7 @@ export async function selectProjectHook(db: DbClient, projectId: string, hookId:
       include: {
         selectedHook: true,
         selectedTemplate: true,
+        selectedUserStyleAsset: true,
         sourceAssets: true,
         transcripts: true
       }
@@ -139,6 +148,7 @@ export async function findProject(db: DbClient, projectId: string) {
       hooks: { orderBy: [{ score: "desc" }, { createdAt: "asc" }] },
       selectedHook: true,
       selectedTemplate: true,
+      selectedUserStyleAsset: true,
       guestFaceAsset: true
     }
   });
@@ -149,6 +159,6 @@ export async function listUserProjects(db: DbClient, userId: string) {
     where: { userId },
     orderBy: { createdAt: "desc" },
     take: 20,
-    include: { selectedTemplate: true, selectedHook: true }
+    include: { selectedTemplate: true, selectedUserStyleAsset: true, selectedHook: true }
   });
 }

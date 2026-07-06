@@ -1,6 +1,6 @@
 export type PaidPlan = "START" | "PRO" | "BUSINESS";
 
-export type PlanFeature = "AI_EDITING" | "STYLE_COPY" | "PRIORITY_QUEUE";
+export type PlanFeature = "AI_EDITING" | "STYLE_COPY" | "CUSTOM_STYLE_UPLOAD" | "PRIORITY_QUEUE";
 
 export type PlanConfig = {
   code: PaidPlan;
@@ -10,7 +10,7 @@ export type PlanConfig = {
   avatarLimit: number | null;
   queuePriority: number;
   features: PlanFeature[];
-  defaultStarsPrice: number;
+  defaultPriceRub: number;
 };
 
 export const TRIAL_CREDITS = 3;
@@ -25,7 +25,7 @@ export const PLAN_CONFIGS: Record<PaidPlan, PlanConfig> = {
     avatarLimit: 1,
     queuePriority: 30,
     features: ["AI_EDITING"],
-    defaultStarsPrice: 1490
+    defaultPriceRub: 1490
   },
   PRO: {
     code: "PRO",
@@ -34,8 +34,8 @@ export const PLAN_CONFIGS: Record<PaidPlan, PlanConfig> = {
     monthlyCredits: 500,
     avatarLimit: 10,
     queuePriority: 10,
-    features: ["AI_EDITING", "STYLE_COPY", "PRIORITY_QUEUE"],
-    defaultStarsPrice: 3990
+    features: ["AI_EDITING", "STYLE_COPY", "CUSTOM_STYLE_UPLOAD", "PRIORITY_QUEUE"],
+    defaultPriceRub: 3990
   },
   BUSINESS: {
     code: "BUSINESS",
@@ -44,8 +44,8 @@ export const PLAN_CONFIGS: Record<PaidPlan, PlanConfig> = {
     monthlyCredits: null,
     avatarLimit: null,
     queuePriority: 1,
-    features: ["AI_EDITING", "STYLE_COPY", "PRIORITY_QUEUE"],
-    defaultStarsPrice: 9900
+    features: ["AI_EDITING", "STYLE_COPY", "CUSTOM_STYLE_UPLOAD", "PRIORITY_QUEUE"],
+    defaultPriceRub: 9900
   }
 };
 

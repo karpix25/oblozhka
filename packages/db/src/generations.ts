@@ -50,14 +50,15 @@ export async function createGenerationFromProject(
       include: {
         selectedHook: true,
         selectedTemplate: true,
+        selectedUserStyleAsset: true,
         guestFaceAsset: true,
         transcripts: true,
         sourceAssets: true
       }
     });
 
-    if (!project.selectedHook || !project.selectedTemplate || !project.platform) {
-      throw new Error("Project must have platform, template and selected hook before generation.");
+    if (!project.selectedHook || !project.platform || (!project.selectedTemplate && !project.selectedUserStyleAsset)) {
+      throw new Error("Project must have platform, style/template and selected hook before generation.");
     }
 
     const format = formatForPlatform(project.platform);
@@ -67,7 +68,9 @@ export async function createGenerationFromProject(
       data: {
         userId: input.userId,
         projectId: input.projectId,
-        templateId: project.selectedTemplate.id,
+        templateId: project.selectedTemplate?.id,
+        userStyleAssetId: project.selectedUserStyleAsset?.id,
+        styleSource: project.styleSource,
         hookCandidateId: project.selectedHook.id,
         platform: project.platform,
         format,
@@ -78,7 +81,7 @@ export async function createGenerationFromProject(
         topic,
         hookText: project.selectedHook.text,
         niche: project.platform,
-        style: project.selectedTemplate.title,
+        style: project.selectedTemplate?.title ?? project.selectedUserStyleAsset?.title ?? "Пользовательский стиль",
         prompt: "Prompt will be planned by OpenRouter in the worker.",
         creditCost
       }
@@ -180,7 +183,7 @@ export async function markGenerationFailed(db: DbClient, id: string, errorMessag
 }
 
 export async function findGeneration(db: DbClient, id: string) {
-  return db.generation.findUnique({ where: { id }, include: { user: true, guestFaceAsset: true, template: true } });
+  return db.generation.findUnique({ where: { id }, include: { user: true, guestFaceAsset: true, template: true, userStyleAsset: true } });
 }
 
 export async function listGenerations(db: DbClient) {

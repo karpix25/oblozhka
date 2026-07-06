@@ -31,7 +31,7 @@ import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
 import { generationJobId, generationQueue } from "./queue.js";
-import { balanceKeyboard, backHomeKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
+import { balanceKeyboard, backHomeKeyboard, insufficientCreditsKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
 import { profileFromContext } from "./userProfile.js";
 
@@ -236,9 +236,12 @@ bot.callbackQuery("confirm:generate", async (ctx) => {
     await ctx.reply("Принял задачу. Обычно обложка готова в течение минуты.");
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось создать генерацию.";
+    const isInsufficientCredits = message === "Insufficient credits.";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(message === "Insufficient credits." ? insufficientCreditsMessage() : message, { reply_markup: balanceKeyboard() });
+    await ctx.reply(isInsufficientCredits ? insufficientCreditsMessage() : message, {
+      reply_markup: isInsufficientCredits ? insufficientCreditsKeyboard() : balanceKeyboard()
+    });
   }
 });
 

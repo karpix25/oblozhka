@@ -92,11 +92,11 @@ function UsersTable({ users, onChanged }: { users: User[]; onChanged: () => void
 function PackagesTable({ packages, onChanged }: { packages: CreditPackage[]; onChanged: () => void }) {
   async function create() {
     const title = prompt("Tariff title");
-    const starsPrice = Number(prompt("Stars price"));
+    const priceRub = Number(prompt("Price, RUB"));
     const credits = Number(prompt("Monthly credits, 0 for unlimited"));
     const plan = prompt("Plan code: START, PRO, BUSINESS") as CreditPackage["plan"];
-    if (!title || !Number.isInteger(starsPrice) || !Number.isInteger(credits)) return;
-    await adminApi.createPackage({ title, starsPrice, credits, plan: plan || undefined, slug: plan?.toLowerCase() });
+    if (!title || !Number.isInteger(priceRub) || !Number.isInteger(credits)) return;
+    await adminApi.createPackage({ title, priceRub, credits, plan: plan || undefined, slug: plan?.toLowerCase() });
     onChanged();
   }
 
@@ -104,13 +104,13 @@ function PackagesTable({ packages, onChanged }: { packages: CreditPackage[]; onC
     <>
       <button className="primary" onClick={create}>New tariff</button>
       <table>
-        <thead><tr><th>Title</th><th>Plan</th><th>Stars</th><th>Credits/mo</th><th>Active</th><th /></tr></thead>
+        <thead><tr><th>Title</th><th>Plan</th><th>RUB</th><th>Credits/mo</th><th>Active</th><th /></tr></thead>
         <tbody>
           {packages.map((pack) => (
             <tr key={pack.id}>
               <td>{pack.title}</td>
               <td>{pack.plan ?? "legacy"}</td>
-              <td>{pack.starsPrice}</td>
+              <td>{pack.priceRub}</td>
               <td>{pack.plan === "BUSINESS" ? "unlimited" : pack.credits}</td>
               <td>{pack.isActive ? "yes" : "no"}</td>
               <td>
@@ -127,7 +127,7 @@ function PackagesTable({ packages, onChanged }: { packages: CreditPackage[]; onC
 }
 
 function PaymentsTable({ payments }: { payments: Payment[] }) {
-  return <table><thead><tr><th>User</th><th>Status</th><th>Stars</th><th>Credits</th><th>Charge</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id}><td>{payment.user?.username ?? payment.user?.telegramId}</td><td>{payment.status}</td><td>{payment.starsAmount}</td><td>{payment.creditsGranted}</td><td>{payment.telegramPaymentChargeId}</td></tr>)}</tbody></table>;
+  return <table><thead><tr><th>User</th><th>Status</th><th>RUB</th><th>Credits</th><th>Transaction</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id}><td>{payment.user?.username ?? payment.user?.telegramId}</td><td>{payment.status}</td><td>{payment.amountRub} {payment.currency}</td><td>{payment.creditsGranted}</td><td>{payment.providerTransactionId ?? payment.providerStatus}</td></tr>)}</tbody></table>;
 }
 
 function GenerationsTable({ generations }: { generations: Generation[] }) {

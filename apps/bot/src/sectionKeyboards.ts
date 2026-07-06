@@ -8,6 +8,10 @@ export function balanceKeyboard() {
   return new InlineKeyboard().text("💳 Тарифы", "tariffs").row().text("🏠 В начало", "home");
 }
 
+export function insufficientCreditsKeyboard() {
+  return new InlineKeyboard().text("⭐ Выбрать тариф", "packages").row().text("💎 Баланс", "balance").text("🏠 В начало", "home");
+}
+
 export function tariffsKeyboard() {
   return new InlineKeyboard().text("⭐ Выбрать тариф", "packages").row().text("⬅️ Назад", "home").text("🏠 В начало", "home");
 }

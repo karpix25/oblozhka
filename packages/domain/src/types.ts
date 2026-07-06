@@ -10,12 +10,26 @@ export type ProjectPlatform = "YOUTUBE" | "INSTAGRAM_TIKTOK" | "FACELESS";
 
 export type ProjectStatus =
   | "DRAFT"
+  | "SOURCE_PROCESSING"
   | "SOURCE_READY"
+  | "SOURCE_FAILED"
   | "HOOKS_PENDING"
   | "HOOKS_READY"
   | "GENERATION_PENDING"
   | "COMPLETED"
   | "FAILED";
+
+export const PROJECT_STATUSES: ProjectStatus[] = [
+  "DRAFT",
+  "SOURCE_PROCESSING",
+  "SOURCE_READY",
+  "SOURCE_FAILED",
+  "HOOKS_PENDING",
+  "HOOKS_READY",
+  "GENERATION_PENDING",
+  "COMPLETED",
+  "FAILED"
+];
 
 export type GenerationStatus = "QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED";
 
@@ -36,7 +50,7 @@ export type CreditPackageInput = {
   title: string;
   slug?: string;
   description?: string;
-  starsPrice: number;
+  priceRub: number;
   credits: number;
   plan?: PaidPlan;
   isActive?: boolean;

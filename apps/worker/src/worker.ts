@@ -17,6 +17,7 @@ import { ObjectStorage } from "@covers/storage";
 import { Worker } from "bullmq";
 import { createPreview, normalizeFinal } from "./imageProcessing.js";
 import { TelegramNotifier } from "./notifier.js";
+import { projectStatusAfterGeneration } from "./projectStatus.js";
 import { prepareReferenceImageUrls } from "./referenceImages.js";
 import { prepareTemplateReferenceUrl } from "./templateReference.js";
 
@@ -71,7 +72,14 @@ new Worker<GenerationJobData, void, string>(
               promptRules: generation.template.promptRules
             }
           : undefined,
-        templateReferenceImageUrl: templateReferenceUrl
+        templateReferenceImageUrl: templateReferenceUrl,
+        userStyle: generation.userStyleAsset
+          ? {
+              title: generation.userStyleAsset.title,
+              promptRules: generation.userStyleAsset.promptRules,
+              imageUrl: generation.userStyleAsset.imageUrl ?? generation.userStyleAsset.sourceImageUrl
+            }
+          : undefined
       });
       await updateGenerationPrompt(prisma, generation.id, {
         prompt: plan.prompt,
@@ -88,7 +96,12 @@ new Worker<GenerationJobData, void, string>(
         urls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
         storage
       });
-      const imageReferenceUrls = templateReferenceUrl ? [...referenceUrls, templateReferenceUrl] : referenceUrls;
+      const styleReferenceUrl = generation.userStyleAsset?.imageUrl ?? generation.userStyleAsset?.sourceImageUrl;
+      const imageReferenceUrls = [
+        ...referenceUrls,
+        ...(templateReferenceUrl ? [templateReferenceUrl] : []),
+        ...(styleReferenceUrl ? [styleReferenceUrl] : [])
+      ];
 
       const result = await imageClient.generate({
         prompt: plan.prompt,
@@ -115,6 +128,9 @@ new Worker<GenerationJobData, void, string>(
         previewUrl,
         providerMeta: { imageModel: result.model, promptPlannerModel: plan.model, raw: result.raw }
       });
+      if (generation.projectId) {
+        await markProjectStatus(prisma, generation.projectId, projectStatusAfterGeneration("SUCCEEDED"));
+      }
       await notifier.sendGenerationResult(job.data.userTelegramId, {
         previewUrl,
         originalUrl,
@@ -130,6 +146,9 @@ new Worker<GenerationJobData, void, string>(
       });
       if (isFinalAttempt(job)) {
         await markGenerationFailed(prisma, generation.id, error instanceof Error ? error.message : "Unknown error");
+        if (generation.projectId) {
+          await markProjectStatus(prisma, generation.projectId, projectStatusAfterGeneration("FAILED"));
+        }
         await notifier.sendGenerationFailure(job.data.userTelegramId);
       }
       throw error;
@@ -153,8 +172,8 @@ new Worker<HookJobData, void, string>(
       const hooks = await promptPlanner.generateHooks({
         transcript: textForHooks,
         platform: project.platform ?? "YOUTUBE",
-        templateTitle: project.selectedTemplate?.title,
-        templateRules: project.selectedTemplate?.promptRules
+        templateTitle: project.selectedTemplate?.title ?? project.selectedUserStyleAsset?.title ?? undefined,
+        templateRules: project.selectedTemplate?.promptRules ?? project.selectedUserStyleAsset?.promptRules ?? undefined
       });
       const savedHooks = await replaceProjectHooks(prisma, project.id, hooks);
       await markProjectStatus(prisma, project.id, "HOOKS_READY");

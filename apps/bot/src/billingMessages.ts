@@ -6,7 +6,7 @@ type TariffPackage = {
   id: string;
   title: string;
   description?: string | null;
-  starsPrice: number;
+  priceRub: number;
   credits: number;
   plan?: PaidPlan | null;
 };
@@ -49,7 +49,8 @@ export function insufficientCreditsMessage() {
   return [
     "Кредиты закончились.",
     "",
-    "Чтобы продолжить генерации и правки, выберите тариф: Start, Pro или Business."
+    "Чтобы продолжить генерации и правки, выберите тариф: Start, Pro или Business.",
+    "Нажмите «Выбрать тариф», и бот сразу откроет оплату."
   ].join("\n");
 }
 
@@ -90,9 +91,9 @@ function packageButtonLabel(pack: TariffPackage) {
   if (pack.plan) {
     const config = PLAN_CONFIGS[pack.plan];
     const credits = config.monthlyCredits === null ? "безлимит" : `${config.monthlyCredits} кредитов/мес`;
-    return `${config.title}: ${credits} за ${pack.starsPrice} ⭐`;
+    return `${config.title}: ${credits} за ${pack.priceRub} ₽`;
   }
-  return `${pack.title}: ${pack.credits} кредитов за ${pack.starsPrice} ⭐`;
+  return `${pack.title}: ${pack.credits} кредитов за ${pack.priceRub} ₽`;
 }
 
 function formatDate(date: Date) {

@@ -1,34 +1,67 @@
-import type { SuccessfulPayment } from "@covers/telegram-payments";
+import type { PaymentStatus } from "@prisma/client";
 import type { DbClient } from "./client.js";
 import { activateSubscriptionInTransaction } from "./subscriptions.js";
 
-export async function createPendingPayment(
-  db: DbClient,
-  input: { userId: string; packageId: string; payload: string; starsAmount: number; credits: number }
-) {
+export type PendingPlategaPaymentInput = {
+  userId: string;
+  packageId: string;
+  payload: string;
+  amountRub: number;
+  credits: number;
+  providerTransactionId: string;
+  providerStatus: string;
+  paymentUrl: string;
+  expiresAt?: Date;
+  raw?: object;
+};
+
+export type PlategaPaymentUpdate = {
+  providerTransactionId: string;
+  providerStatus: string;
+  amountRub: number;
+  currency: string;
+  raw?: object;
+};
+
+export async function createPendingPlategaPayment(db: DbClient, input: PendingPlategaPaymentInput) {
   return db.payment.upsert({
     where: { payload: input.payload },
     create: {
       userId: input.userId,
       packageId: input.packageId,
       payload: input.payload,
-      starsAmount: input.starsAmount,
-      creditsGranted: input.credits
+      amountRub: input.amountRub,
+      currency: "RUB",
+      creditsGranted: input.credits,
+      providerTransactionId: input.providerTransactionId,
+      providerStatus: input.providerStatus,
+      paymentUrl: input.paymentUrl,
+      expiresAt: input.expiresAt,
+      raw: input.raw
     },
-    update: {}
+    update: {
+      providerTransactionId: input.providerTransactionId,
+      providerStatus: input.providerStatus,
+      paymentUrl: input.paymentUrl,
+      expiresAt: input.expiresAt,
+      raw: input.raw
+    },
+    include: { package: true }
   });
 }
 
-export async function completeStarsPayment(
-  db: DbClient,
-  input: { userId: string; payment: SuccessfulPayment }
-) {
+export async function completePlategaPayment(db: DbClient, input: PlategaPaymentUpdate) {
   return db.$transaction(async (tx) => {
     const existing = await tx.payment.findUnique({
-      where: { payload: input.payment.invoicePayload }
+      where: { providerTransactionId: input.providerTransactionId },
+      include: { package: true }
     });
 
-    if (!existing || existing.status === "SUCCEEDED") {
+    if (!existing) {
+      throw new Error("Payment was not found for Platega transaction.");
+    }
+    assertPaymentMatches(existing, input);
+    if (existing.status === "SUCCEEDED") {
       return existing;
     }
 
@@ -36,39 +69,57 @@ export async function completeStarsPayment(
       where: { id: existing.id },
       data: {
         status: "SUCCEEDED",
-        telegramPaymentChargeId: input.payment.telegramPaymentChargeId,
-        providerPaymentChargeId: input.payment.providerPaymentChargeId,
-        raw: input.payment.raw
+        providerStatus: input.providerStatus,
+        confirmedAt: new Date(),
+        raw: input.raw
       }
     });
 
-    const pack = existing.packageId
-      ? await tx.creditPackage.findUnique({ where: { id: existing.packageId } })
-      : null;
-
-    if (pack?.plan) {
+    if (existing.package?.plan) {
       await activateSubscriptionInTransaction(tx, {
-        userId: input.userId,
-        plan: pack.plan,
+        userId: existing.userId,
+        plan: existing.package.plan,
         sourcePaymentId: payment.id
       });
     } else if (payment.creditsGranted > 0) {
       await tx.creditLedgerEntry.create({
         data: {
-          userId: input.userId,
+          userId: existing.userId,
           amount: payment.creditsGranted,
           reason: "PURCHASE",
           referenceId: payment.id,
-          note: "Legacy credits purchase"
+          note: "Credits purchase"
         }
       });
       await tx.user.update({
-        where: { id: input.userId },
+        where: { id: existing.userId },
         data: { balance: { increment: payment.creditsGranted } }
       });
     }
 
     return payment;
+  });
+}
+
+export async function markPlategaPaymentNotSuccessful(
+  db: DbClient,
+  input: PlategaPaymentUpdate & { status: Extract<PaymentStatus, "FAILED" | "CANCELED" | "CHARGEBACKED"> }
+) {
+  return db.payment.update({
+    where: { providerTransactionId: input.providerTransactionId },
+    data: {
+      status: input.status,
+      providerStatus: input.providerStatus,
+      failedAt: new Date(),
+      raw: input.raw
+    }
+  });
+}
+
+export async function findPaymentByProviderTransaction(db: DbClient, providerTransactionId: string) {
+  return db.payment.findUnique({
+    where: { providerTransactionId },
+    include: { user: true, package: true }
   });
 }
 
@@ -78,4 +129,13 @@ export async function listPayments(db: DbClient) {
     orderBy: { createdAt: "desc" },
     take: 200
   });
+}
+
+function assertPaymentMatches(existing: { amountRub: number; currency: string }, input: PlategaPaymentUpdate) {
+  if (existing.currency !== "RUB" || input.currency !== "RUB") {
+    throw new Error("Payment currency mismatch.");
+  }
+  if (existing.amountRub !== input.amountRub) {
+    throw new Error("Payment amount mismatch.");
+  }
 }

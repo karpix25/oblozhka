@@ -4,7 +4,7 @@
   "type": "module",
   "workspaces": [
     "packages/domain",
-    "packages/telegram-payments",
+    "packages/payments",
     "packages/db",
     "packages/generation-ai",
     "packages/media-source",
@@ -22,6 +22,7 @@
     "dev:bot": "npm --workspace @covers/bot run dev",
     "dev:worker": "npm --workspace @covers/worker run dev",
     "dev:admin": "npm --workspace @covers/admin run dev",
+    "test": "node --import tsx --test tests/*.test.ts",
     "test:templates": "node scripts/local-template-batch.mjs",
     "assets:bot": "node scripts/generate-bot-assets.mjs",
     "prisma:generate": "prisma generate --schema packages/db/prisma/schema.prisma",

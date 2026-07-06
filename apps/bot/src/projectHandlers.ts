@@ -1,5 +1,6 @@
 import {
   createProject,
+  findProject,
   listUserFaceAssets,
   listTemplates,
   prisma,
@@ -12,7 +13,7 @@ import {
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
 import { openFaceLibrary } from "./faceLibrary.js";
-import { platformKeyboard, sourceTypeKeyboard } from "./keyboards.js";
+import { platformKeyboard, sourceTypeKeyboard, styleSourceKeyboard } from "./keyboards.js";
 import { askGuestFace, requiresGuestFace, saveUploadedGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
 import {
   platformPrompt,
@@ -28,6 +29,7 @@ import { askReferenceForGeneration, saveUploadedReferenceFace, useSavedReference
 import { backHomeKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, resetWizard } from "./session.js";
 import { sendFaceGallery, type FaceGalleryMode } from "./faceGallery.js";
+import { openStyleLibrary, saveUploadedStyle, selectUserStyleForProject, startStyleUpload } from "./styleLibrary.js";
 import { sendTemplateGallery } from "./templateGallery.js";
 import { profileFromContext } from "./userProfile.js";
 
@@ -45,6 +47,14 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
 
   bot.callbackQuery("faces:mine", async (ctx) => {
     await openFaceLibrary(ctx, { fromCallback: true });
+  });
+
+  bot.callbackQuery("styles:mine", async (ctx) => {
+    await openStyleLibrary(ctx, { fromCallback: true });
+  });
+
+  bot.callbackQuery("styles:upload", async (ctx) => {
+    await startStyleUpload(ctx);
   });
 
   bot.callbackQuery("templates:library", async (ctx) => {
@@ -101,11 +111,27 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
     }
     const platform = ctx.match[1] as ProjectPlatform;
     await setProjectPlatform(prisma, ctx.session.projectId, platform);
+    await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+    await ctx.reply("Выберите источник стиля:", { reply_markup: styleSourceKeyboard() });
+  });
+
+  bot.callbackQuery("style-source:library", async (ctx) => {
+    if (!ctx.session.projectId) {
+      await ctx.answerCallbackQuery("Сначала создайте проект.");
+      return;
+    }
+    const project = await findProject(prisma, ctx.session.projectId);
+    const platform = project?.platform ?? "YOUTUBE";
     const templates = await listTemplates(prisma, platform);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
     ctx.session.templateGalleryMode = "select";
     await sendTemplateGallery(ctx, templates, { mode: "select", platform });
+  });
+
+  bot.callbackQuery("style-source:custom", async (ctx) => {
+    await openStyleLibrary(ctx, { fromCallback: true, selectForProject: true });
   });
 
   bot.callbackQuery(/^template:(.+)$/, async (ctx) => {
@@ -122,6 +148,13 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string) {
       return;
     }
     await enqueueHooks(ctx);
+  });
+
+  bot.callbackQuery(/^style:use:(.+)$/, async (ctx) => {
+    if (await selectUserStyleForProject(ctx, ctx.match[1])) {
+      await deleteCallbackMessage(ctx);
+      await enqueueHooks(ctx);
+    }
   });
 
   bot.callbackQuery(/^guestface:use:(.+)$/, async (ctx) => {
@@ -229,6 +262,10 @@ export async function handleProjectText(ctx: BotContext) {
 }
 
 export async function handleProjectPhoto(ctx: BotContext, token: string) {
+  if (await saveUploadedStyle(ctx, token)) {
+    return true;
+  }
+
   const guestFaceResult = await saveUploadedGuestFace(ctx, token);
   if (guestFaceResult === "saved") {
     await hookQueue.add("generate-hooks", { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id }, { jobId: hookJobId(ctx.session.projectId!) });

@@ -6,8 +6,9 @@ export function mainKeyboard() {
     .text("🎨 Создать обложку", "project:start")
     .row()
     .text("👤 Мои лица", "faces:mine")
-    .text("🖼 Шаблоны", "templates:library")
+    .text("🎭 Мои стили", "styles:mine")
     .row()
+    .text("🖼 Шаблоны", "templates:library")
     .text("📁 Мои проекты", "projects:mine")
     .text("💎 Баланс", "balance")
     .row()
@@ -15,6 +16,15 @@ export function mainKeyboard() {
     .text("❓ Как это работает", "how")
     .row()
     .text("💬 Поддержка", "support");
+}
+
+export function styleSourceKeyboard() {
+  return new InlineKeyboard()
+    .text("🖼 Библиотека шаблонов", "style-source:library")
+    .row()
+    .text("🎭 Мой стиль", "style-source:custom")
+    .row()
+    .text("🏠 В начало", "home");
 }
 
 export function sourceTypeKeyboard() {

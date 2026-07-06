@@ -31,4 +31,9 @@ export type PromptPlanningInput = {
     promptRules?: string | null;
   };
   templateReferenceImageUrl?: string;
+  userStyle?: {
+    title?: string | null;
+    promptRules?: string | null;
+    imageUrl?: string | null;
+  };
 };

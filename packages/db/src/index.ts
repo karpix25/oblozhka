@@ -11,4 +11,5 @@ export * from "./projects.js";
 export * from "./subscriptions.js";
 export * from "./templates.js";
 export * from "./transcripts.js";
+export * from "./userStyleAssets.js";
 export * from "./users.js";

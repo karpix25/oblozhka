@@ -4,7 +4,7 @@ import type { DbClient } from "./client.js";
 export async function listActivePackages(db: DbClient) {
   return db.creditPackage.findMany({
     where: { isActive: true },
-    orderBy: { starsPrice: "asc" }
+    orderBy: { priceRub: "asc" }
   });
 }
 
@@ -21,7 +21,7 @@ export async function createPackage(db: DbClient, input: CreditPackageInput) {
       plan: input.plan,
       title: input.title,
       description: input.description,
-      starsPrice: input.starsPrice,
+      priceRub: input.priceRub,
       credits: input.credits,
       isActive: input.isActive ?? true
     }
@@ -39,7 +39,7 @@ export async function seedDefaultTariffPackages(db: DbClient) {
   for (const plan of PAID_PLAN_ORDER) {
     const config = getPlanConfig(plan);
     const slug = plan.toLowerCase();
-    const envPrice = process.env[`${plan}_STARS_PRICE`];
+    const envPrice = process.env[`${plan}_PRICE_RUB`];
     await db.creditPackage.upsert({
       where: { slug },
       create: {
@@ -47,7 +47,7 @@ export async function seedDefaultTariffPackages(db: DbClient) {
         plan,
         title: config.title,
         description: config.description,
-        starsPrice: envPrice ? Number(envPrice) : config.defaultStarsPrice,
+        priceRub: envPrice ? Number(envPrice) : config.defaultPriceRub,
         credits: config.monthlyCredits ?? 0,
         isActive: true
       },

@@ -1,7 +1,7 @@
 import { createGenerationFromProject, prisma } from "@covers/db";
 import { insufficientCreditsMessage } from "./billingMessages.js";
 import { generationJobId, generationQueue } from "./queue.js";
-import { backHomeKeyboard } from "./sectionKeyboards.js";
+import { backHomeKeyboard, insufficientCreditsKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 
 export async function createAndEnqueueProjectGeneration(
@@ -24,8 +24,9 @@ export async function createAndEnqueueProjectGeneration(
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось создать генерацию.";
-    await ctx.reply(message === "Insufficient credits." ? insufficientCreditsMessage() : message, {
-      reply_markup: backHomeKeyboard("tariffs")
+    const isInsufficientCredits = message === "Insufficient credits.";
+    await ctx.reply(isInsufficientCredits ? insufficientCreditsMessage() : message, {
+      reply_markup: isInsufficientCredits ? insufficientCreditsKeyboard() : backHomeKeyboard("tariffs")
     });
     return false;
   }

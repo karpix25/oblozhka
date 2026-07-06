@@ -38,7 +38,7 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ amount, note })
     }),
-  createPackage: (input: Pick<CreditPackage, "title" | "starsPrice" | "credits"> & Partial<Pick<CreditPackage, "slug" | "plan">>) =>
+  createPackage: (input: Pick<CreditPackage, "title" | "priceRub" | "credits"> & Partial<Pick<CreditPackage, "slug" | "plan">>) =>
     request<CreditPackage>("/packages", {
       method: "POST",
       body: JSON.stringify(input)
