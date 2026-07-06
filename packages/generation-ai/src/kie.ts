@@ -1,6 +1,7 @@
 import type { ImageGenerationInput, ImageGenerationResult } from "./types.js";
 
 type KieResponse = Record<string, unknown>;
+type KieGenerateInput = ImageGenerationInput & { signal?: AbortSignal };
 
 export class KieImageClient {
   private readonly apiKey: string;
@@ -8,18 +9,31 @@ export class KieImageClient {
   private readonly model: string;
   private readonly pollIntervalMs: number;
   private readonly pollTimeoutMs: number;
+  private readonly requestTimeoutMs: number;
+  private readonly downloadTimeoutMs: number;
   private readonly callbackUrl?: string;
 
-  constructor(config: { apiKey?: string; baseUrl?: string; model?: string; callbackUrl?: string } = {}) {
+  constructor(
+    config: {
+      apiKey?: string;
+      baseUrl?: string;
+      model?: string;
+      callbackUrl?: string;
+      requestTimeoutMs?: number;
+      downloadTimeoutMs?: number;
+    } = {}
+  ) {
     this.apiKey = config.apiKey ?? process.env.KIE_API_KEY ?? "";
     this.baseUrl = (config.baseUrl ?? process.env.KIE_BASE_URL ?? "https://api.kie.ai").replace(/\/$/, "");
     this.model = config.model ?? process.env.KIE_IMAGE_MODEL ?? "gpt-image-2-image-to-image";
-    this.pollIntervalMs = Number(process.env.KIE_POLL_INTERVAL_MS ?? 3000);
-    this.pollTimeoutMs = Number(process.env.KIE_POLL_TIMEOUT_MS ?? 900000);
+    this.pollIntervalMs = positiveNumber(process.env.KIE_POLL_INTERVAL_MS, 3000);
+    this.pollTimeoutMs = positiveNumber(process.env.KIE_POLL_TIMEOUT_MS, 900000);
+    this.requestTimeoutMs = config.requestTimeoutMs ?? positiveNumber(process.env.KIE_REQUEST_TIMEOUT_MS, 120000);
+    this.downloadTimeoutMs = config.downloadTimeoutMs ?? positiveNumber(process.env.KIE_DOWNLOAD_TIMEOUT_MS, 120000);
     this.callbackUrl = config.callbackUrl ?? process.env.KIE_CALLBACK_URL;
   }
 
-  async generate(input: ImageGenerationInput): Promise<ImageGenerationResult> {
+  async generate(input: KieGenerateInput): Promise<ImageGenerationResult> {
     if (!this.apiKey) {
       throw new Error("KIE_API_KEY is required.");
     }
@@ -38,9 +52,9 @@ export class KieImageClient {
         aspect_ratio: input.aspectRatio,
         resolution: input.resolution ?? "1K"
       }
-    });
+    }, input.signal);
 
-    const immediate = await this.extractImage(response);
+    const immediate = await this.extractImage(response, input.signal);
     if (immediate) {
       return { bytes: immediate, model: this.model, raw: response };
     }
@@ -50,15 +64,15 @@ export class KieImageClient {
       throw new Error("Kie.ai did not return image bytes, image URL, or a task id.");
     }
 
-    return this.pollTask(taskId, response);
+    return this.pollTask(taskId, response, input.signal);
   }
 
-  private async pollTask(taskId: string, initial: KieResponse): Promise<ImageGenerationResult> {
+  private async pollTask(taskId: string, initial: KieResponse, signal?: AbortSignal): Promise<ImageGenerationResult> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < this.pollTimeoutMs) {
-      await new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs));
-      const status = await this.get(`${this.baseUrl}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`);
-      const image = await this.extractImage(status);
+      await sleep(this.pollIntervalMs, signal);
+      const status = await this.get(`${this.baseUrl}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`, signal);
+      const image = await this.extractImage(status, signal);
       if (image) {
         return { bytes: image, model: this.model, raw: { initial, status } };
       }
@@ -70,34 +84,50 @@ export class KieImageClient {
     throw new Error("Kie.ai task timed out.");
   }
 
-  private async post(url: string, body: object): Promise<KieResponse> {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        "content-type": "application/json"
+  private async post(url: string, body: object, signal?: AbortSignal): Promise<KieResponse> {
+    const response = await fetchTextWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(body)
       },
-      body: JSON.stringify(body)
-    });
+      {
+        signal,
+        timeoutMs: this.requestTimeoutMs,
+        description: "Kie.ai request"
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`Kie.ai request failed: ${response.status} ${await response.text()}`);
+      throw new Error(`Kie.ai request failed: ${response.status} ${response.text}`);
     }
-    return response.json() as Promise<KieResponse>;
+    return JSON.parse(response.text) as KieResponse;
   }
 
-  private async get(url: string): Promise<KieResponse> {
-    const response = await fetch(url, {
-      headers: { authorization: `Bearer ${this.apiKey}` }
-    });
+  private async get(url: string, signal?: AbortSignal): Promise<KieResponse> {
+    const response = await fetchTextWithTimeout(
+      url,
+      {
+        headers: { authorization: `Bearer ${this.apiKey}` }
+      },
+      {
+        signal,
+        timeoutMs: this.requestTimeoutMs,
+        description: "Kie.ai polling"
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`Kie.ai polling failed: ${response.status} ${await response.text()}`);
+      throw new Error(`Kie.ai polling failed: ${response.status} ${response.text}`);
     }
-    return response.json() as Promise<KieResponse>;
+    return JSON.parse(response.text) as KieResponse;
   }
 
-  private async extractImage(response: KieResponse): Promise<Buffer | undefined> {
+  private async extractImage(response: KieResponse, signal?: AbortSignal): Promise<Buffer | undefined> {
     const normalized = this.withParsedResultJson(response);
     const value = this.findString(normalized, ["b64_json", "base64", "image_base64", "url", "image_url", "imageUrl", "output", "resultUrls"]);
     if (!value) return undefined;
@@ -108,24 +138,35 @@ export class KieImageClient {
       return Buffer.from(value, "base64");
     }
     if (value.startsWith("http")) {
-      return this.downloadImage(value);
+      return this.downloadImage(value, signal);
     }
     return undefined;
   }
 
-  private async downloadImage(url: string): Promise<Buffer> {
+  private async downloadImage(url: string, signal?: AbortSignal): Promise<Buffer> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        const image = await fetch(url);
+        const image = await fetchBufferWithTimeout(
+          url,
+          {},
+          {
+            signal,
+            timeoutMs: this.downloadTimeoutMs,
+            description: "Kie.ai image download"
+          }
+        );
         if (!image.ok) {
           throw new Error(`Failed to download Kie.ai image: ${image.status}`);
         }
-        return Buffer.from(await image.arrayBuffer());
+        return image.body;
       } catch (error) {
         lastError = error;
+        if (isAbortError(error) || signal?.aborted) {
+          throw error;
+        }
         if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
+          await sleep(attempt * 3000, signal);
         }
       }
     }
@@ -160,4 +201,96 @@ export class KieImageClient {
     }
     return undefined;
   }
+}
+
+async function fetchTextWithTimeout(
+  url: string,
+  init: RequestInit,
+  options: { signal?: AbortSignal; timeoutMs: number; description: string }
+): Promise<{ ok: boolean; status: number; text: string }> {
+  return withTimeoutSignal(options, async (signal) => {
+    const response = await fetch(url, { ...init, signal });
+    return {
+      ok: response.ok,
+      status: response.status,
+      text: await response.text()
+    };
+  });
+}
+
+async function fetchBufferWithTimeout(
+  url: string,
+  init: RequestInit,
+  options: { signal?: AbortSignal; timeoutMs: number; description: string }
+): Promise<{ ok: boolean; status: number; body: Buffer }> {
+  return withTimeoutSignal(options, async (signal) => {
+    const response = await fetch(url, { ...init, signal });
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: Buffer.from(await response.arrayBuffer())
+    };
+  });
+}
+
+async function withTimeoutSignal<T>(
+  options: { signal?: AbortSignal; timeoutMs: number; description: string },
+  action: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs);
+  const abortFromParent = () => controller.abort(options.signal?.reason);
+
+  if (options.signal?.aborted) {
+    abortFromParent();
+  } else {
+    options.signal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
+  try {
+    return await action(controller.signal);
+  } catch (error) {
+    if (timedOut) {
+      throw new Error(`${options.description} timed out after ${options.timeoutMs}ms.`, { cause: error });
+    }
+    if (isAbortError(error) || options.signal?.aborted) {
+      throw new Error(`${options.description} was aborted.`, { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abortFromParent);
+  }
+}
+
+function positiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(new Error("Kie.ai request was aborted."));
+  }
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener("abort", abort);
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error("Kie.ai request was aborted."));
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }

@@ -76,6 +76,7 @@ export async function saveUploadedStyle(ctx: BotContext, token: string) {
     sourceImageUrl: imageUrl,
     title: `Стиль ${new Date().toLocaleDateString("ru-RU")}`,
     promptRules: defaultStylePromptRules(),
+    status: "READY",
     metadata: {
       telegramFileId: photo.file_id,
       sourceTelegramFilePath: file.file_path

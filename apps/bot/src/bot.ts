@@ -30,9 +30,11 @@ import {
 import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
-import { generationJobId, generationQueue } from "./queue.js";
+import { generationJobId, generationQueue, hookQueue } from "./queue.js";
 import { balanceKeyboard, backHomeKeyboard, insufficientCreditsKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
+import { createBotSessionStorage } from "./sessionStorage.js";
+import { startBotRuntime } from "./runtime.js";
 import { profileFromContext } from "./userProfile.js";
 
 const token = process.env.BOT_TOKEN;
@@ -41,7 +43,8 @@ if (!token) {
 }
 
 const bot = new Bot<BotContext>(token);
-bot.use(session({ initial: initialSession }));
+const sessionStorage = createBotSessionStorage();
+bot.use(session({ initial: initialSession, storage: sessionStorage.storage }));
 await seedDefaultTemplates(prisma);
 await seedDefaultTariffPackages(prisma);
 registerBillingHandlers(bot);
@@ -258,4 +261,13 @@ async function askFormatOrTopic(ctx: BotContext) {
   await ctx.reply(topicPrompt(), { reply_markup: backHomeKeyboard() });
 }
 
-bot.start();
+await startBotRuntime(bot, {
+  onShutdown: async () => {
+    await Promise.all([
+      generationQueue.close(),
+      hookQueue.close(),
+      sessionStorage.close(),
+      prisma.$disconnect()
+    ]);
+  }
+});

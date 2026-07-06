@@ -14,7 +14,7 @@ import { GENERATION_QUEUE, HOOK_QUEUE, getFormatSpec, type GenerationJobData, ty
 import { KieImageClient, OpenRouterPromptPlanner } from "@covers/generation-ai";
 import { SourceIngestionService } from "@covers/media-source";
 import { ObjectStorage } from "@covers/storage";
-import { Worker } from "bullmq";
+import { Worker, type WorkerOptions } from "bullmq";
 import { createPreview, normalizeFinal } from "./imageProcessing.js";
 import { TelegramNotifier } from "./notifier.js";
 import { projectStatusAfterGeneration } from "./projectStatus.js";
@@ -35,7 +35,7 @@ const sourceIngestion = new SourceIngestionService();
 const storage = new ObjectStorage();
 const notifier = new TelegramNotifier();
 
-new Worker<GenerationJobData, void, string>(
+const generationWorker = new Worker<GenerationJobData, void, string>(
   GENERATION_QUEUE,
   async (job) => {
     const generation = await findGeneration(prisma, job.data.generationId);
@@ -154,10 +154,15 @@ new Worker<GenerationJobData, void, string>(
       throw error;
     }
   },
-  { connection, concurrency: 2 }
+  buildWorkerOptions({
+    concurrency: positiveIntegerEnv("GENERATION_WORKER_CONCURRENCY", 2),
+    limiterMax: nonNegativeIntegerEnv("GENERATION_WORKER_LIMIT_MAX", 2),
+    limiterDurationMs: positiveIntegerEnv("GENERATION_WORKER_LIMIT_DURATION_MS", 10000)
+  })
 );
+attachWorkerLogging(GENERATION_QUEUE, generationWorker);
 
-new Worker<HookJobData, void, string>(
+const hookWorker = new Worker<HookJobData, void, string>(
   HOOK_QUEUE,
   async (job) => {
     const project = await findProject(prisma, job.data.projectId);
@@ -184,8 +189,13 @@ new Worker<HookJobData, void, string>(
       throw error;
     }
   },
-  { connection, concurrency: 4 }
+  buildWorkerOptions({
+    concurrency: positiveIntegerEnv("HOOK_WORKER_CONCURRENCY", 4),
+    limiterMax: nonNegativeIntegerEnv("HOOK_WORKER_LIMIT_MAX", 8),
+    limiterDurationMs: positiveIntegerEnv("HOOK_WORKER_LIMIT_DURATION_MS", 10000)
+  })
 );
+attachWorkerLogging(HOOK_QUEUE, hookWorker);
 
 async function ensureProjectTranscript(project: NonNullable<Awaited<ReturnType<typeof findProject>>>) {
   const existing = project.transcripts[0]?.cleanText ?? project.transcripts[0]?.rawText;
@@ -219,4 +229,68 @@ async function ensureProjectTranscript(project: NonNullable<Awaited<ReturnType<t
 
 function isFinalAttempt(job: { attemptsMade: number; opts: { attempts?: number } }) {
   return job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+}
+
+function buildWorkerOptions(input: { concurrency: number; limiterMax: number; limiterDurationMs: number }): WorkerOptions {
+  return {
+    connection,
+    concurrency: input.concurrency,
+    limiter: input.limiterMax > 0 ? { max: input.limiterMax, duration: input.limiterDurationMs } : undefined,
+    lockDuration: positiveIntegerEnv("WORKER_LOCK_DURATION_MS", 10 * 60 * 1000),
+    maxStalledCount: positiveIntegerEnv("WORKER_MAX_STALLED_COUNT", 1),
+    stalledInterval: positiveIntegerEnv("WORKER_STALLED_INTERVAL_MS", 30 * 1000)
+  };
+}
+
+function attachWorkerLogging<DataType, ResultType, NameType extends string>(
+  queueName: string,
+  worker: Worker<DataType, ResultType, NameType>
+) {
+  worker.on("completed", (job) => {
+    console.info("Worker job completed", {
+      queueName,
+      jobId: job.id,
+      jobName: job.name,
+      attemptsMade: job.attemptsMade,
+      durationMs: job.finishedOn && job.processedOn ? job.finishedOn - job.processedOn : undefined
+    });
+  });
+
+  worker.on("failed", (job, error, previousState) => {
+    console.error("Worker job failed", {
+      queueName,
+      jobId: job?.id,
+      jobName: job?.name,
+      previousState,
+      attemptsMade: job?.attemptsMade,
+      attempts: job?.opts.attempts,
+      error: formatError(error)
+    });
+  });
+
+  worker.on("stalled", (jobId, previousState) => {
+    console.warn("Worker job stalled", { queueName, jobId, previousState });
+  });
+
+  worker.on("error", (error) => {
+    console.error("Worker runtime error", { queueName, error: formatError(error) });
+  });
+}
+
+function positiveIntegerEnv(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function nonNegativeIntegerEnv(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function formatError(error: Error) {
+  return {
+    name: error.name,
+    message: error.message,
+    stack: error.stack
+  };
 }

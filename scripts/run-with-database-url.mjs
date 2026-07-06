@@ -33,7 +33,7 @@ child.on("exit", (code, signal) => {
 });
 
 async function runDatabaseSetup() {
-  console.log("database: running Prisma schema sync before service start");
+  console.log("database: running Prisma database setup before service start");
 
   const args = ["scripts/db-setup.mjs"];
   const child = spawn("node", args, {

@@ -1,4 +1,4 @@
-import type { PaymentStatus } from "@prisma/client";
+import type { PaymentStatus, Prisma } from "@prisma/client";
 import type { DbClient } from "./client.js";
 import { activateSubscriptionInTransaction } from "./subscriptions.js";
 
@@ -22,6 +22,8 @@ export type PlategaPaymentUpdate = {
   currency: string;
   raw?: object;
 };
+
+type PaymentTransaction = Prisma.TransactionClient;
 
 export async function createPendingPlategaPayment(db: DbClient, input: PendingPlategaPaymentInput) {
   return db.payment.upsert({
@@ -60,20 +62,15 @@ export async function completePlategaPayment(db: DbClient, input: PlategaPayment
     if (!existing) {
       throw new Error("Payment was not found for Platega transaction.");
     }
-    assertPaymentMatches(existing, input);
     if (existing.status === "SUCCEEDED") {
       return existing;
     }
+    assertPaymentMatches(existing, input);
 
-    const payment = await tx.payment.update({
-      where: { id: existing.id },
-      data: {
-        status: "SUCCEEDED",
-        providerStatus: input.providerStatus,
-        confirmedAt: new Date(),
-        raw: input.raw
-      }
-    });
+    const payment = await claimPlategaPaymentCompletion(tx, existing.id, input);
+    if (!payment) {
+      return findSucceededPayment(tx, existing.id);
+    }
 
     if (existing.package?.plan) {
       await activateSubscriptionInTransaction(tx, {
@@ -105,14 +102,32 @@ export async function markPlategaPaymentNotSuccessful(
   db: DbClient,
   input: PlategaPaymentUpdate & { status: Extract<PaymentStatus, "FAILED" | "CANCELED" | "CHARGEBACKED"> }
 ) {
-  return db.payment.update({
-    where: { providerTransactionId: input.providerTransactionId },
-    data: {
-      status: input.status,
-      providerStatus: input.providerStatus,
-      failedAt: new Date(),
-      raw: input.raw
+  return db.$transaction(async (tx) => {
+    const existing = await tx.payment.findUnique({
+      where: { providerTransactionId: input.providerTransactionId }
+    });
+    if (!existing) {
+      throw new Error("Payment was not found for Platega transaction.");
     }
+    if (existing.status === "SUCCEEDED") {
+      return existing;
+    }
+    assertPaymentMatches(existing, input);
+
+    const updateResult = await tx.payment.updateMany({
+      where: { id: existing.id, status: { not: "SUCCEEDED" } },
+      data: {
+        status: input.status,
+        providerStatus: input.providerStatus,
+        failedAt: new Date(),
+        raw: input.raw
+      }
+    });
+
+    if (updateResult.count === 0) {
+      return findPaymentById(tx, existing.id);
+    }
+    return findPaymentById(tx, existing.id);
   });
 }
 
@@ -138,4 +153,38 @@ function assertPaymentMatches(existing: { amountRub: number; currency: string },
   if (existing.amountRub !== input.amountRub) {
     throw new Error("Payment amount mismatch.");
   }
+}
+
+async function claimPlategaPaymentCompletion(
+  tx: PaymentTransaction,
+  paymentId: string,
+  input: PlategaPaymentUpdate
+) {
+  const updateResult = await tx.payment.updateMany({
+    where: { id: paymentId, status: "PENDING" },
+    data: {
+      status: "SUCCEEDED",
+      providerStatus: input.providerStatus,
+      confirmedAt: new Date(),
+      failedAt: null,
+      raw: input.raw
+    }
+  });
+
+  if (updateResult.count === 0) {
+    return null;
+  }
+  return findPaymentById(tx, paymentId);
+}
+
+async function findSucceededPayment(tx: PaymentTransaction, paymentId: string) {
+  const payment = await findPaymentById(tx, paymentId);
+  if (payment.status !== "SUCCEEDED") {
+    throw new Error("Payment completion was not confirmed.");
+  }
+  return payment;
+}
+
+async function findPaymentById(tx: PaymentTransaction, paymentId: string) {
+  return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
 }

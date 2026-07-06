@@ -6,6 +6,7 @@ export type CreateUserStyleAssetInput = {
   sourceImageUrl: string;
   title?: string;
   promptRules?: string;
+  status?: UserStyleAssetStatus;
   metadata?: object;
 };
 
@@ -17,6 +18,7 @@ export async function createUserStyleAsset(db: DbClient, input: CreateUserStyleA
       imageUrl: input.sourceImageUrl,
       title: input.title,
       promptRules: input.promptRules,
+      status: input.status,
       metadata: input.metadata
     }
   });

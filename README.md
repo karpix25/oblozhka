@@ -63,6 +63,9 @@ cp .env.docker.example .env.docker
 
 ```bash
 BOT_TOKEN=""
+BOT_WEBHOOK_URL=""
+BOT_WEBHOOK_HOST="0.0.0.0"
+BOT_WEBHOOK_PORT="8080"
 SUPPORT_CONTACT="@karlo25"
 PRIVACY_POLICY_URL="https://telegra.ph/Politika-konfidencialnosti-06-21-31"
 USER_AGREEMENT_URL="https://telegra.ph/Polzovatelskoe-soglashenie-04-01-19"
@@ -92,12 +95,19 @@ The stack includes:
 - `worker`
 - `bot`
 
-The API container applies the Prisma schema to Postgres before starting with
-`prisma db push`. In the Docker MVP path,
-`PRISMA_DB_PUSH_ACCEPT_DATA_LOSS=true` is enabled so Coolify can update an
-early test database without an interactive prompt. For a production release
-with versioned migrations, disable that flag and replace the startup sync with
-`prisma migrate deploy` after creating the first migration.
+The API container applies versioned Prisma migrations before starting with
+`prisma migrate deploy`. This is the production-safe default and does not use
+`prisma db push --accept-data-loss`.
+
+For disposable local Docker databases only, you can opt into schema push:
+
+```bash
+PRISMA_DB_SETUP_MODE=push docker compose up --build
+```
+
+If that local push needs destructive changes, set
+`PRISMA_DB_PUSH_ACCEPT_DATA_LOSS=true` explicitly for that run. Do not use that
+flag in production.
 
 If a Postgres volume already exists, changing `POSTGRES_PASSWORD` does not
 change the stored database password. In that case set `DATABASE_URL` to the
@@ -115,8 +125,26 @@ docker compose down -v
 Use `docker compose down -v` only when you want to delete local Postgres and
 Redis data.
 
-The MVP uses Telegram Stars for digital goods. Credits are granted only after
-`successful_payment`, never after `pre_checkout_query`.
+Payments use Platega RUB transactions. Credits or subscriptions are granted only
+after Platega reports a confirmed transaction, and payment completion is
+idempotent so duplicate callbacks do not grant access twice.
+
+## Telegram Bot Runtime
+
+By default the bot runs in long polling mode. This is the recommended local
+development mode and does not require a public URL.
+
+Set `BOT_WEBHOOK_URL` to switch the bot to webhook mode:
+
+```bash
+BOT_WEBHOOK_URL="https://your-domain.example/telegram/webhook"
+BOT_WEBHOOK_HOST="0.0.0.0"
+BOT_WEBHOOK_PORT="8080"
+```
+
+When webhook mode is enabled, the bot sets the Telegram webhook to
+`BOT_WEBHOOK_URL` and starts an HTTP listener on `BOT_WEBHOOK_HOST` and
+`BOT_WEBHOOK_PORT`. Point your reverse proxy or tunnel at that listener.
 
 ## Required AI Env
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PlategaClient, decodePaymentPayload, encodePaymentPayload, normalizePlategaCallback } from "../packages/payments/src/index.js";
+import { createUserStyleAsset } from "../packages/db/src/userStyleAssets.js";
 import { detectSocialPlatform } from "../packages/media-source/src/urlDetection.js";
 
 test("payment payload is round-trippable", () => {
@@ -82,6 +83,36 @@ test("platega callback normalization keeps payload compatible", () => {
   assert.equal(callback.status, "CONFIRMED");
   assert.equal(callback.amount, 499);
   assert.deepEqual(decodePaymentPayload(payload), { packageId: "pro", userId: "user-2", nonce: "nonce-2" });
+});
+
+test("user style upload can create an immediately selectable style", async () => {
+  let createdData: unknown;
+  const db = {
+    userStyleAsset: {
+      create: async ({ data }: { data: unknown }) => {
+        createdData = data;
+        return data;
+      }
+    }
+  };
+
+  await createUserStyleAsset(db as never, {
+    userId: "user-1",
+    sourceImageUrl: "https://cdn.example/style.png",
+    title: "Стиль",
+    promptRules: "Keep layout rhythm.",
+    status: "READY"
+  });
+
+  assert.deepEqual(createdData, {
+    userId: "user-1",
+    sourceImageUrl: "https://cdn.example/style.png",
+    imageUrl: "https://cdn.example/style.png",
+    title: "Стиль",
+    promptRules: "Keep layout rhythm.",
+    status: "READY",
+    metadata: undefined
+  });
 });
 
 test("social source detection routes common video links", () => {
