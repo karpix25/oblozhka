@@ -70,6 +70,29 @@ test("platega client reads transaction status endpoint", async () => {
   assert.equal(transaction.status, "CONFIRMED");
 });
 
+test("platega client accepts documented redirect transaction response field", async () => {
+  const client = new PlategaClient({ baseUrl: "https://platega.test/api", merchantId: "merchant-1", secret: "secret-1" });
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({
+      transactionId: "tx-redirect",
+      status: "PENDING",
+      redirect: "https://pay.example/redirect",
+      usdtRate: 92
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+  const transaction = await client.createTransaction({
+    amountRub: 199,
+    description: "Старт",
+    returnUrl: "https://bot.example/success",
+    failedUrl: "https://bot.example/failed",
+    payload: encodePaymentPayload({ packageId: "start", userId: "user-1", nonce: "nonce-1" }),
+    metadata: { userId: "user-1" }
+  });
+
+  assert.equal(transaction.url, "https://pay.example/redirect");
+  assert.equal(transaction.rate, 92);
+});
+
 test("platega callback normalization keeps payload compatible", () => {
   const payload = encodePaymentPayload({ packageId: "pro", userId: "user-2", nonce: "nonce-2" });
   const callback = normalizePlategaCallback({

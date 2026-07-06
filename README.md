@@ -129,6 +129,21 @@ Payments use Platega RUB transactions. Credits or subscriptions are granted only
 after Platega reports a confirmed transaction, and payment completion is
 idempotent so duplicate callbacks do not grant access twice.
 
+Configure these Platega environment variables in production:
+
+```bash
+PLATEGA_BASE_URL="https://app.platega.io/"
+PLATEGA_MERCHANT_ID="..."
+PLATEGA_SECRET="..."
+PAYMENT_RETURN_URL="https://t.me/karpix_oblozhka_bot"
+```
+
+In the Platega cabinet, set the transaction status callback URL to:
+
+```text
+https://your-api-domain.example/payments/platega/callback
+```
+
 ## Telegram Bot Runtime
 
 By default the bot runs in long polling mode. This is the recommended local

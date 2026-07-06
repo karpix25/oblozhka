@@ -56,17 +56,26 @@ export class PlategaClient {
       throw new Error(`Platega create transaction failed: ${response.status} ${JSON.stringify(raw)}`);
     }
 
-    const body = raw as { transactionId?: string; status?: string; url?: string; expiresIn?: string; rate?: number };
-    if (!body.transactionId || !body.url || !body.status) {
-      throw new Error("Platega create transaction response is missing transactionId, status or url.");
+    const body = raw as {
+      transactionId?: string;
+      status?: string;
+      url?: string;
+      redirect?: string;
+      expiresIn?: string;
+      rate?: number;
+      usdtRate?: number;
+    };
+    const paymentUrl = body.url ?? body.redirect;
+    if (!body.transactionId || !paymentUrl || !body.status) {
+      throw new Error("Platega create transaction response is missing transactionId, status or payment URL.");
     }
 
     return {
       transactionId: body.transactionId,
       status: body.status,
-      url: body.url,
+      url: paymentUrl,
       expiresIn: body.expiresIn,
-      rate: body.rate,
+      rate: body.rate ?? body.usdtRate,
       raw
     };
   }
