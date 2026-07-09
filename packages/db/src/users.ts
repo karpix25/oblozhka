@@ -1,4 +1,5 @@
 import { TRIAL_CREDITS, type UserProfile } from "@covers/domain";
+import { serializeAdminUser } from "./adminSerializers.js";
 import type { DbClient } from "./client.js";
 
 export async function upsertTelegramUser(db: DbClient, profile: UserProfile) {
@@ -30,8 +31,9 @@ export async function findUserByTelegramId(db: DbClient, telegramId: number) {
 }
 
 export async function listUsers(db: DbClient) {
-  return db.user.findMany({
+  const users = await db.user.findMany({
     orderBy: { createdAt: "desc" },
     take: 200
   });
+  return users.map(serializeAdminUser);
 }

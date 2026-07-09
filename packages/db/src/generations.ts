@@ -1,4 +1,5 @@
 import { getModernizationAction, type ModernizationActionId, type ProjectPlatform, type WizardInput } from "@covers/domain";
+import { serializeAdminUser } from "./adminSerializers.js";
 import type { DbClient } from "./client.js";
 import { debitGenerationCreditInTransaction, refundGenerationCreditInTransaction } from "./credits.js";
 
@@ -282,9 +283,13 @@ export async function findGeneration(db: DbClient, id: string) {
 }
 
 export async function listGenerations(db: DbClient) {
-  return db.generation.findMany({
+  const generations = await db.generation.findMany({
     include: { user: true },
     orderBy: { createdAt: "desc" },
     take: 200
   });
+  return generations.map((generation) => ({
+    ...generation,
+    user: serializeAdminUser(generation.user)
+  }));
 }

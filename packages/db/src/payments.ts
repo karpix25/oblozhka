@@ -1,4 +1,5 @@
 import type { PaymentStatus, Prisma } from "@prisma/client";
+import { serializeAdminUser } from "./adminSerializers.js";
 import type { DbClient } from "./client.js";
 import { reversePurchasedCreditsInTransaction } from "./credits.js";
 import { activateSubscriptionInTransaction, cancelSubscriptionsForPaymentInTransaction } from "./subscriptions.js";
@@ -160,11 +161,15 @@ export async function findPaymentByProviderTransaction(db: DbClient, providerTra
 }
 
 export async function listPayments(db: DbClient) {
-  return db.payment.findMany({
+  const payments = await db.payment.findMany({
     include: { user: true, package: true },
     orderBy: { createdAt: "desc" },
     take: 200
   });
+  return payments.map((payment) => ({
+    ...payment,
+    user: serializeAdminUser(payment.user)
+  }));
 }
 
 function assertPaymentMatches(existing: { amountRub: number; currency: string }, input: PlategaPaymentUpdate) {
