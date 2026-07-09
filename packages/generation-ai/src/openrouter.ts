@@ -170,7 +170,11 @@ export class OpenRouterPromptPlanner {
           input.wizard.guestReferenceImageUrl
             ? "Есть второй человек/гость. Используй его как отдельное лицо второго участника, особенно для podcast/podcast countdown композиций."
             : "Второго лица/гостя нет.",
+          input.wizard.referenceMode === "FACE"
+            ? "Главное лицо должно быть максимально похоже на Image 1: тот же человек, узнаваемая геометрия лица, тон кожи, глаза, нос, рот, линия волос и пропорции. Не делай усреднённое похожее лицо."
+            : "Если лица пользователя нет, не выдумывай сходство с человеком из шаблона.",
           "Сохрани композиционный скелет выбранного шаблона или пользовательского стиля: расположение лица/объекта, зоны текста, крупность, глубину, направление взгляда/объекта, цветовую иерархию и характер шрифта.",
+          "Шаблон и пользовательский стиль не являются источником личности: нельзя брать с них черты лица, волосы, возраст, выражение, этничность или персональное сходство.",
           "Промпт должен явно описать layout zones, typography/font feel, text placement, subject/object placement, foreground/background depth, color accents.",
           "Не копируй чужой дизайн один-в-один. Бери только композицию, настроение, контраст и читаемость.",
           "Промпт должен требовать крупный фокусный объект, чистую композицию, русский текст без ошибок, коммерческий thumbnail-look.",
@@ -215,13 +219,13 @@ export class OpenRouterPromptPlanner {
 
   private fallbackPlan(input: PromptPlanningInput): PromptPlan {
     const faceRule = input.wizard.referenceMode === "FACE"
-      ? "Use the uploaded face photo as identity reference; keep the person recognizable, flattering and expressive."
+      ? "Use Image 1 as the strict identity source of truth; keep the same person highly recognizable with matching facial geometry, skin tone, eyes, nose, mouth, hairline and proportions. Do not create a generic similar face."
       : "Create an original thumbnail composition; do not copy any third-party design exactly.";
     const templateRule = input.userStyle?.promptRules
       ? [
           `Mandatory custom user style: ${input.userStyle.title ?? input.wizard.style}.`,
           `Custom style rules: ${input.userStyle.promptRules}.`,
-          "Use the custom style reference as style only: composition rhythm, colors, typography feel and text zones. Do not copy exact content."
+          "Use the custom style reference as style only: composition rhythm, colors, typography feel and text zones. Do not copy exact content, faces, hair, expressions or personal likeness."
         ].join(" ")
       : input.template?.promptRules
       ? [
@@ -237,6 +241,7 @@ export class OpenRouterPromptPlanner {
         referenceRoleContract(input),
         faceRule,
         input.wizard.guestReferenceImageUrl ? "Use the second uploaded face as a separate guest/person in the composition." : "",
+        "Template/style references control layout and design only; do not borrow facial features from them.",
         input.wizard.hookText ? `Large readable Russian cover text: "${input.wizard.hookText}".` : "No unnecessary text.",
         "Bold focal subject, clean background, strong contrast, readable at small size, no watermarks."
       ].join("\n");
@@ -253,7 +258,7 @@ export class OpenRouterPromptPlanner {
         `Выбран пользовательский стиль: ${input.userStyle.title ?? input.wizard.style}.`,
         `Правила пользовательского стиля:\n${input.userStyle.promptRules ?? "Use the uploaded style reference as a style guide."}`,
         "Картинка пользовательского стиля является style reference: брать композиционный ритм, контраст, цветовую палитру, характер типографики и зоны текста.",
-        "Не копировать точный контент, лица, бренды, логотипы и текст из style reference."
+        "Не копировать точный контент, лица, черты лица, волосы, выражение, бренды, логотипы и текст из style reference."
       ].join("\n");
     }
 
@@ -265,6 +270,7 @@ export class OpenRouterPromptPlanner {
       `Выбранный шаблон: ${templateName}.`,
       `Slug шаблона: ${templateSlug}.`,
       `Обязательные правила шаблона:\n${rules}`,
+      "Шаблон не является face reference: не брать с него черты лица, волосы, выражение, возраст, этничность или персональное сходство.",
       "Эти правила важнее общих эстетических пожеланий."
     ].join("\n");
   }

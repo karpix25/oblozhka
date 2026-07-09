@@ -14,6 +14,10 @@ export function validateImagePrompt(prompt: string, input: PromptPlanningInput):
   if (input.template?.slug) requireIncludes(normalized, input.template.slug.toLowerCase(), "template slug", issues);
   if (input.wizard.hookText) requireIncludes(normalized, input.wizard.hookText.toLowerCase(), "hook text", issues);
   requireAny(normalized, ["image 1", "reference image 1", "uploaded face"], "image 1 role", issues);
+  if (input.wizard.referenceMode === "FACE") {
+    requireAny(normalized, ["identity source of truth", "same person", "recognizable", "likeness"], "face identity preservation", issues);
+    requireAny(normalized, ["do not borrow facial features", "never infer or borrow facial features", "template/style references control layout"], "template face isolation", issues);
+  }
   if (input.templateReferenceImageUrl) {
     requireAny(normalized, ["template preview", "composition skeleton", "template image"], "template reference role", issues);
   }
@@ -32,7 +36,8 @@ export function repairImagePrompt(prompt: string, input: PromptPlanningInput, is
     `Aspect ratio: ${input.aspectRatio}.`,
     input.template?.title ? `Selected template: ${input.template.title} (${input.template.slug ?? "unknown slug"}).` : "",
     input.wizard.hookText ? `Exact cover text policy: use the hook text "${input.wizard.hookText}" exactly unless the template says no overlay text.` : "",
-    "Reference roles: Image 1 is identity/base visual only; the template preview image is composition skeleton only.",
+    "Reference roles: Image 1 is the identity source of truth for the main person; keep the same person recognizable and preserve facial geometry, skin tone, eyes, nose, mouth, hairline and proportions as closely as possible.",
+    "Template/style references control layout and design only. Do not borrow facial features, hair, expression, age, ethnicity or personal likeness from template/style references.",
     "Preserve text zones, typography feel, subject/object placement, color hierarchy, foreground/background depth.",
     "Negative rules: avoid clutter, tiny unreadable text, extra logos, watermarks, unrelated objects, and changing the selected template layout.",
     `Validation issues repaired: ${issues.join(", ")}.`

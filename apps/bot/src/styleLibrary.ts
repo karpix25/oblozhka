@@ -152,7 +152,8 @@ function defaultStylePromptRules() {
   return [
     "Use the uploaded style reference only as a visual style guide.",
     "Preserve its composition rhythm, contrast level, color palette, typography feel, text zones, subject scale and background depth.",
-    "Do not copy exact text, logos, faces, brands or unique protected content from the style reference.",
+    "Do not copy exact text, logos, faces, facial features, hair, expressions, body identity, brands or unique protected content from the style reference.",
+    "If a user's face reference is provided, that face reference is the only source of human likeness; the style reference must not influence the person's identity.",
     "Adapt the style to the current topic and selected hook while keeping the final thumbnail original and readable."
   ].join(" ");
 }
