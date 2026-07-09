@@ -47,6 +47,12 @@ if (!token) {
 const bot = new Bot<BotContext>(token);
 const sessionStorage = createBotSessionStorage();
 const abuseGuard = createBotAbuseGuard();
+bot.catch((error) => {
+  console.error("Bot update failed.", error.error);
+  if (error.ctx.callbackQuery) {
+    error.ctx.answerCallbackQuery("Не получилось выполнить действие. Попробуйте ещё раз.").catch(() => undefined);
+  }
+});
 bot.use(session({ initial: initialSession, storage: sessionStorage.storage }));
 await seedDefaultTemplates(prisma);
 await seedDefaultTariffPackages(prisma);

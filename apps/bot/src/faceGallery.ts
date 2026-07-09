@@ -1,4 +1,5 @@
 import { InlineKeyboard, InputMediaBuilder } from "grammy";
+import { toTelegramPhotoUrl } from "./mediaUrls.js";
 import { backHomeKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 
@@ -25,13 +26,21 @@ export async function sendFaceGallery(
   const face = faces[page];
   const caption = faceCaption(face, page, faces.length);
   const keyboard = faceGalleryKeyboard({ mode: input.mode, page, total: faces.length, faceId: face.id });
+  const photoUrl = toTelegramPhotoUrl(face.imageUrl);
 
-  if (input.replace) {
-    const edited = await editFaceGalleryMessage(ctx, face.imageUrl, caption, keyboard);
+  if (input.replace && photoUrl) {
+    const edited = await editFaceGalleryMessage(ctx, photoUrl, caption, keyboard);
     if (edited) return;
   }
 
-  await ctx.replyWithPhoto(face.imageUrl, { caption, reply_markup: keyboard });
+  if (photoUrl) {
+    await ctx.replyWithPhoto(photoUrl, { caption, reply_markup: keyboard });
+    return;
+  }
+
+  await ctx.reply(`${caption}\n\nНе получилось открыть изображение аватара. Загрузите новое фото.`, {
+    reply_markup: keyboard
+  });
 }
 
 function faceGalleryKeyboard(input: { mode: FaceGalleryMode; page: number; total: number; faceId: string }) {
