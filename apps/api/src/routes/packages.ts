@@ -1,4 +1,4 @@
-import { createPackage, listPackages, prisma, updatePackage } from "@covers/db";
+import { createAuditLog, createPackage, listPackages, prisma, updatePackage } from "@covers/db";
 import type { CreditPackageInput } from "@covers/domain";
 import type { FastifyInstance } from "fastify";
 
@@ -14,6 +14,46 @@ export async function packageRoutes(app: FastifyInstance) {
 
   app.patch<{ Body: Partial<CreditPackageInput>; Params: { id: string } }>(
     "/packages/:id",
-    async (request) => updatePackage(prisma, request.params.id, request.body)
+    async (request, reply) => {
+      const previous = await prisma.creditPackage.findUnique({
+        where: { id: request.params.id }
+      });
+      if (!previous) {
+        return reply.code(404).send({ error: "package_not_found" });
+      }
+
+      const updated = await updatePackage(prisma, request.params.id, request.body);
+      await createAuditLog(prisma, {
+        actor: "admin",
+        action: "package.update",
+        target: request.params.id,
+        metadata: {
+          changes: request.body,
+          before: packageAuditSnapshot(previous),
+          after: packageAuditSnapshot(updated)
+        }
+      });
+      return updated;
+    }
   );
+}
+
+function packageAuditSnapshot(pkg: {
+  slug: string | null;
+  plan: string | null;
+  title: string;
+  description: string | null;
+  priceRub: number;
+  credits: number;
+  isActive: boolean;
+}) {
+  return {
+    slug: pkg.slug,
+    plan: pkg.plan,
+    title: pkg.title,
+    description: pkg.description,
+    priceRub: pkg.priceRub,
+    credits: pkg.credits,
+    isActive: pkg.isActive
+  };
 }

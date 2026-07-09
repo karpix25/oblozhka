@@ -107,6 +107,7 @@ model User {
   languageCode   String?
   status         UserStatus          @default(ACTIVE)
   balance        Int                 @default(3)
+  lastSeenAt     DateTime?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   ledgerEntries  CreditLedgerEntry[]
@@ -118,6 +119,7 @@ model User {
   styleAssets    UserStyleAsset[]
 
   @@index([status, createdAt])
+  @@index([lastSeenAt])
 }
 
 model UserStyleAsset {

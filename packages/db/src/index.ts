@@ -1,4 +1,5 @@
 export * from "./admin.js";
+export * from "./analytics.js";
 export * from "./client.js";
 export * from "./credits.js";
 export * from "./faceAssets.js";

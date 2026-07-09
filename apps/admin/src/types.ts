@@ -5,6 +5,7 @@ export type User = {
   firstName?: string;
   balance: number;
   status: string;
+  lastSeenAt?: string;
   createdAt: string;
 };
 
@@ -53,4 +54,31 @@ export type PromptPreset = {
   style: string;
   promptTemplate: string;
   isActive: boolean;
+};
+
+export type AdminAnalyticsSummary = {
+  generatedAt: string;
+  users: {
+    total: number;
+    new: WindowCounts;
+    active: WindowCounts;
+  };
+  generations: {
+    total: number;
+    byStatus: Record<"QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED", number>;
+  };
+  payments: {
+    successfulCount: number;
+    revenueRub: number;
+    averageCheckRub: number;
+  };
+  subscriptions: {
+    activeByPlan: Record<"START" | "PRO" | "BUSINESS", number>;
+  };
+};
+
+export type WindowCounts = {
+  today: number;
+  last7Days: number;
+  last30Days: number;
 };

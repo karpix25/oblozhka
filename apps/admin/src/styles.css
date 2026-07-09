@@ -23,6 +23,27 @@ button:hover {
   border-color: #2563eb;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+input {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #172033;
+  font: inherit;
+  max-width: 100%;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+input:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgba(37, 99, 235, 0.16);
+}
+
 .shell {
   margin: 0 auto;
   max-width: 1180px;
@@ -60,6 +81,102 @@ h1 {
   color: #ffffff;
 }
 
+.dashboard {
+  display: grid;
+  gap: 18px;
+}
+
+.metric-grid,
+.panel-grid,
+.status-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.metric-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.panel-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.status-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metric-card,
+.panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.metric-card {
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+  padding: 18px;
+}
+
+.metric-card.compact {
+  min-height: 84px;
+  padding: 14px;
+}
+
+.metric-card span,
+.muted {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.metric-card strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.metric-card.compact strong {
+  font-size: 24px;
+}
+
+.panel {
+  padding: 18px;
+}
+
+.panel h2,
+.panel-heading h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.panel-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.metric-list {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr auto;
+  margin: 14px 0 0;
+}
+
+.metric-list dt,
+.metric-list dd {
+  margin: 0;
+}
+
+.metric-list dt {
+  color: #64748b;
+}
+
+.metric-list dd {
+  font-weight: 700;
+}
+
 table {
   background: #ffffff;
   border-collapse: collapse;
@@ -84,10 +201,29 @@ th {
   font-weight: 600;
 }
 
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .error {
   background: #fee2e2;
   border: 1px solid #fecaca;
   border-radius: 6px;
   color: #991b1b;
   padding: 12px;
+}
+
+@media (max-width: 860px) {
+  .metric-grid,
+  .panel-grid,
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar,
+  .tabs {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }

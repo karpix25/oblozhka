@@ -1,4 +1,4 @@
-import type { CreditPackage, Generation, Payment, PromptPreset, User } from "./types.js";
+import type { AdminAnalyticsSummary, CreditPackage, Generation, Payment, PromptPreset, User } from "./types.js";
 import { readAdminToken } from "./adminToken.js";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:3000";
@@ -23,6 +23,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const adminApi = {
+  analytics: () => request<AdminAnalyticsSummary>("/analytics/summary"),
   users: () => request<User[]>("/users"),
   packages: () => request<CreditPackage[]>("/packages"),
   payments: () => request<Payment[]>("/payments"),
