@@ -18,8 +18,7 @@ export function redisConnectionOptions(): RedisOptions {
 }
 
 export async function pingRedis(): Promise<void> {
-  const client = new Redis(redisConnectionOptions());
-  client.on("error", () => undefined);
+  const client = await createReadyRedisClient();
   try {
     const result = await client.ping();
     if (result !== "PONG") {
@@ -28,6 +27,16 @@ export async function pingRedis(): Promise<void> {
   } finally {
     client.disconnect();
   }
+}
+
+export async function createReadyRedisClient(): Promise<Redis> {
+  const client = new Redis({
+    ...redisConnectionOptions(),
+    lazyConnect: true
+  });
+  client.on("error", () => undefined);
+  await client.connect();
+  return client;
 }
 
 function redisCheckTimeoutMs() {

@@ -1,6 +1,6 @@
 import { FACE_CARD_QUEUE, GENERATION_QUEUE, HOOK_QUEUE } from "@covers/domain";
 import { Redis } from "ioredis";
-import { redisConnectionOptions } from "./redis.js";
+import { createReadyRedisClient } from "./redis.js";
 
 export const MONITORED_QUEUE_NAMES = [GENERATION_QUEUE, HOOK_QUEUE, FACE_CARD_QUEUE] as const;
 const LIST_STATES = ["waiting", "active"] as const;
@@ -21,8 +21,7 @@ export type QueueStatus = {
 };
 
 export async function collectQueueStatuses(now = new Date()): Promise<QueueStatus[]> {
-  const client = new Redis(redisConnectionOptions());
-  client.on("error", () => undefined);
+  const client = await createReadyRedisClient();
   try {
     return await Promise.all(MONITORED_QUEUE_NAMES.map((name) => collectQueueStatus(client, name, now)));
   } finally {
