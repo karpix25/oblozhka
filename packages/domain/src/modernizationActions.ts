@@ -1,7 +1,8 @@
 import { minPlanForFeature, planHasFeature, type PaidPlan, type PlanFeature } from "./plans.js";
 
 export type ModernizationActionId =
-  | "custom_edit";
+  | "custom_edit"
+  | "replicate_template";
 
 export type ModernizationAction = {
   id: ModernizationActionId;
@@ -18,6 +19,13 @@ export const MODERNIZATION_ACTIONS: ModernizationAction[] = [
     queuedLabel: "внесу вашу правку",
     requiredFeature: "AI_EDITING",
     promptInstruction: "Apply the user's requested edit to the finished thumbnail while preserving the useful parts of the original image."
+  },
+  {
+    id: "replicate_template",
+    label: "🔁 Повторить шаблон",
+    queuedLabel: "повторю шаблон референса",
+    requiredFeature: "REPLICATE_TEMPLATE",
+    promptInstruction: "Use the uploaded reference as a template guide for future original thumbnails without copying protected text, logos, faces or brands."
   }
 ];
 

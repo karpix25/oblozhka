@@ -11,6 +11,7 @@ import { insufficientCreditsMessage } from "./billingMessages.js";
 import { enqueueGenerationOrCompensate } from "./generationQueueing.js";
 import { balanceKeyboard, insufficientCreditsKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
+import { startStyleUpload } from "./styleLibrary.js";
 import { profileFromContext } from "./userProfile.js";
 
 export function registerResultActionHandlers(bot: Bot<BotContext>, abuseGuard: BotAbuseGuard) {
@@ -45,12 +46,22 @@ export function registerResultActionHandlers(bot: Bot<BotContext>, abuseGuard: B
       return;
     }
 
+    if (action.id === "replicate_template") {
+      await startStyleUpload(ctx, {
+        deleteSourceMessage: false,
+        prompt: [
+          "Загрузите обложку или скрин, шаблон которого хотите повторять.",
+          "",
+          "Я сохраню его как ваш стиль: композицию, контраст, цветовую логику, типографику и зоны текста. Потом этот стиль можно выбирать для новых обложек."
+        ].join("\n")
+      });
+      return;
+    }
+
     ctx.session.step = "modernizationPrompt";
     ctx.session.modernization = { generationId: sourceGeneration.id, actionId: action.id };
     await ctx.answerCallbackQuery();
-    await ctx.reply("Опишите, что изменить в этой обложке. Например: «замени текст на ...», «сделай фон темнее», «добавь красную стрелку справа».", {
-      reply_markup: new InlineKeyboard().text("🏠 В начало", "home")
-    });
+    await ctx.reply(customEditPromptMessage(), { reply_markup: new InlineKeyboard().text("🏠 В начало", "home") });
   });
 }
 
@@ -123,4 +134,13 @@ export async function handleResultActionText(ctx: BotContext, abuseGuard: BotAbu
 
 function lockedModernizationKeyboard() {
   return new InlineKeyboard().text("⭐ Выбрать тариф", "packages").row().text("💳 Все тарифы", "tariffs").text("🏠 В начало", "home");
+}
+
+function customEditPromptMessage() {
+  return [
+    "Опишите, что изменить в этой обложке.",
+    "",
+    "Можно менять текст, фон, лицо, объект, цвета, композицию или любой другой элемент.",
+    "Например: «замени текст на ...», «сделай фон темнее», «добавь красную стрелку справа», «убери лишний объект»."
+  ].join("\n");
 }

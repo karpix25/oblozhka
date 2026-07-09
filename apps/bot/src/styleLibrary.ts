@@ -40,7 +40,12 @@ export async function openStyleLibrary(ctx: BotContext, input: { fromCallback?: 
   });
 }
 
-export async function startStyleUpload(ctx: BotContext) {
+type StyleUploadOptions = {
+  deleteSourceMessage?: boolean;
+  prompt?: string;
+};
+
+export async function startStyleUpload(ctx: BotContext, options: StyleUploadOptions = {}) {
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const access = await getBillingAccess(prisma, user.id);
   if (!canUseCustomStyle(access)) {
@@ -50,8 +55,10 @@ export async function startStyleUpload(ctx: BotContext) {
   }
   ctx.session.step = "styleUpload";
   await ctx.answerCallbackQuery().catch(() => undefined);
-  await deleteCallbackMessage(ctx).catch(() => undefined);
-  await ctx.reply("Отправьте картинку-референс: обложку или кадр, стиль которого нужно сохранить.", {
+  if (options.deleteSourceMessage !== false) {
+    await deleteCallbackMessage(ctx).catch(() => undefined);
+  }
+  await ctx.reply(options.prompt ?? "Отправьте картинку-референс: обложку или кадр, стиль которого нужно сохранить.", {
     reply_markup: backHomeKeyboard()
   });
 }
