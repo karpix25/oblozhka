@@ -1,6 +1,7 @@
 import {
   createProject,
   findProject,
+  getBillingAccess,
   listUserFaceAssets,
   listTemplates,
   prisma,
@@ -112,9 +113,11 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
     }
     const platform = ctx.match[1] as ProjectPlatform;
     await setProjectPlatform(prisma, ctx.session.projectId, platform);
+    const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
+    const access = await getBillingAccess(prisma, user.id);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply("Выберите источник стиля:", { reply_markup: styleSourceKeyboard() });
+    await ctx.reply("Выберите источник стиля:", { reply_markup: styleSourceKeyboard(access) });
   });
 
   bot.callbackQuery("style-source:library", async (ctx) => {

@@ -1,12 +1,14 @@
 import { DEFAULT_NICHES, DEFAULT_STYLES, FORMAT_SPECS, templateDisplayName, type ProjectPlatform } from "@covers/domain";
+import type { BillingAccess } from "@covers/db";
 import { InlineKeyboard } from "grammy";
+import { customStyleMenuLabel, customStyleSourceLabel } from "./planUi.js";
 
-export function mainKeyboard() {
+export function mainKeyboard(access?: BillingAccess) {
   return new InlineKeyboard()
     .text("🎨 Создать обложку", "project:start")
     .row()
     .text("👤 Мои лица", "faces:mine")
-    .text("🎭 Мои стили", "styles:mine")
+    .text(customStyleMenuLabel(access), "styles:mine")
     .row()
     .text("🖼 Шаблоны", "templates:library")
     .text("📁 Мои проекты", "projects:mine")
@@ -18,11 +20,11 @@ export function mainKeyboard() {
     .text("💬 Поддержка", "support");
 }
 
-export function styleSourceKeyboard() {
+export function styleSourceKeyboard(access?: BillingAccess) {
   return new InlineKeyboard()
     .text("🖼 Библиотека шаблонов", "style-source:library")
     .row()
-    .text("🎭 Мой стиль", "style-source:custom")
+    .text(customStyleSourceLabel(access), "style-source:custom")
     .row()
     .text("🏠 В начало", "home");
 }

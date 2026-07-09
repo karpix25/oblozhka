@@ -7,9 +7,9 @@ import {
   setProjectUserStyleAsset,
   upsertTelegramUser
 } from "@covers/db";
-import { canUseEntitlement } from "@covers/domain";
 import { InlineKeyboard } from "grammy";
 import { deleteCallbackMessage } from "./navigation.js";
+import { canUseCustomStyle, customStyleUploadLabel } from "./planUi.js";
 import { backHomeKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 import { profileFromContext } from "./userProfile.js";
@@ -22,28 +22,28 @@ export async function openStyleLibrary(ctx: BotContext, input: { fromCallback?: 
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const access = await getBillingAccess(prisma, user.id);
-  if (!canUseEntitlement(entitlementSubject(access), "CUSTOM_STYLE_UPLOAD")) {
-    await ctx.reply(customStyleUpsellMessage(), { reply_markup: customStyleUpsellKeyboard() });
+  if (!canUseCustomStyle(access)) {
+    await ctx.reply(customStyleUpsellMessage(), { reply_markup: customStyleUpsellKeyboard(input.selectForProject) });
     return;
   }
 
   const styles = await listUserStyleAssets(prisma, { userId: user.id, statuses: ["READY"], take: 20 });
   if (styles.length === 0) {
     await ctx.reply("Своих стилей пока нет. Загрузите референс-обложку, и я сохраню её стиль для следующих генераций.", {
-      reply_markup: styleLibraryKeyboard({ hasStyles: false })
+      reply_markup: styleLibraryKeyboard({ access, hasStyles: false })
     });
     return;
   }
 
   await ctx.reply("Ваши стили:", {
-    reply_markup: styleListKeyboard(styles, Boolean(input.selectForProject))
+    reply_markup: styleListKeyboard(styles, { access, selectForProject: Boolean(input.selectForProject) })
   });
 }
 
 export async function startStyleUpload(ctx: BotContext) {
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const access = await getBillingAccess(prisma, user.id);
-  if (!canUseEntitlement(entitlementSubject(access), "CUSTOM_STYLE_UPLOAD")) {
+  if (!canUseCustomStyle(access)) {
     await ctx.answerCallbackQuery().catch(() => undefined);
     await ctx.reply(customStyleUpsellMessage(), { reply_markup: customStyleUpsellKeyboard() });
     return;
@@ -83,8 +83,9 @@ export async function saveUploadedStyle(ctx: BotContext, token: string) {
     }
   });
   ctx.session.step = "idle";
+  const access = await getBillingAccess(prisma, user.id);
   await ctx.reply("Стиль сохранён. Теперь его можно выбрать при создании обложки.", {
-    reply_markup: styleLibraryKeyboard({ hasStyles: true })
+    reply_markup: styleLibraryKeyboard({ access, hasStyles: true })
   });
   return true;
 }
@@ -105,36 +106,39 @@ export async function selectUserStyleForProject(ctx: BotContext, styleId: string
   return true;
 }
 
-function styleLibraryKeyboard(input: { hasStyles: boolean }) {
-  const keyboard = new InlineKeyboard().text("➕ Загрузить стиль", "styles:upload");
+function styleLibraryKeyboard(input: { access: Awaited<ReturnType<typeof getBillingAccess>>; hasStyles: boolean }) {
+  const keyboard = new InlineKeyboard().text(customStyleUploadLabel(input.access), "styles:upload");
   if (input.hasStyles) keyboard.row().text("🎨 Создать обложку", "project:start");
   keyboard.row().text("🏠 В начало", "home");
   return keyboard;
 }
 
-function styleListKeyboard(styles: Array<{ id: string; title: string | null }>, selectForProject: boolean) {
+function styleListKeyboard(
+  styles: Array<{ id: string; title: string | null }>,
+  input: { access: Awaited<ReturnType<typeof getBillingAccess>>; selectForProject: boolean }
+) {
   const keyboard = new InlineKeyboard();
   styles.forEach((style) => keyboard.text(style.title ?? "Пользовательский стиль", `style:use:${style.id}`).row());
-  keyboard.text("➕ Загрузить стиль", "styles:upload").row();
-  if (!selectForProject) keyboard.text("🎨 Создать обложку", "project:start").row();
+  keyboard.text(customStyleUploadLabel(input.access), "styles:upload").row();
+  if (!input.selectForProject) keyboard.text("🎨 Создать обложку", "project:start").row();
   keyboard.text("🏠 В начало", "home");
   return keyboard;
 }
 
-function customStyleUpsellKeyboard() {
-  return new InlineKeyboard().text("⭐ Выбрать тариф", "packages").row().text("💳 Все тарифы", "tariffs").text("🏠 В начало", "home");
+function customStyleUpsellKeyboard(selectForProject = false) {
+  const keyboard = new InlineKeyboard().text("⭐ Выбрать тариф", "packages").row();
+  if (selectForProject) {
+    keyboard.text("🖼 Выбрать шаблон", "style-source:library").row();
+  }
+  return keyboard.text("💳 Все тарифы", "tariffs").text("🏠 В начало", "home");
 }
 
 function customStyleUpsellMessage() {
   return [
     "Свой стиль доступен на тарифах Pro и Business.",
     "",
-    "Вы сможете загрузить референс-обложку, сохранить её стиль и применять его к новым генерациям."
+    "Кнопка видна заранее, но на текущем тарифе она закрыта. После апгрейда вы сможете загрузить референс-обложку, сохранить её стиль и применять его к новым генерациям."
   ].join("\n");
-}
-
-function entitlementSubject(access: Awaited<ReturnType<typeof getBillingAccess>>) {
-  return access.kind === "subscription" ? { kind: "subscription" as const, plan: access.plan } : { kind: "trial" as const };
 }
 
 function defaultStylePromptRules() {

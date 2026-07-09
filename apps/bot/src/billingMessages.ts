@@ -62,10 +62,18 @@ export function avatarLimitMessage(limit: number | null) {
   if (limit === null) {
     return "Лимит аватаров не достигнут.";
   }
+  if (limit === 1) {
+    return [
+      "На текущем доступе можно сохранить 1 аватар.",
+      "",
+      "Кнопки загрузки остаются видны, но новые аватары откроются после апгрейда: Pro даёт до 10 аватаров, Business — без жесткого лимита.",
+      "Можно использовать уже сохранённый аватар или перейти на тариф выше."
+    ].join("\n");
+  }
   return [
     `Лимит аватаров на вашем доступе: ${limit}.`,
     "",
-    "Можно использовать уже сохранённый аватар или перейти на тариф выше."
+    "Можно использовать уже сохранённый аватар или перейти на тариф выше. Business даёт аватары без жесткого лимита."
   ].join("\n");
 }
 
@@ -87,7 +95,9 @@ function tariffLines(plan: PaidPlan) {
   const credits = config.monthlyCredits === null ? "безлимит кредитов" : `${config.monthlyCredits} кредитов в месяц`;
   const avatars = config.avatarLimit === null ? "аватары без жесткого лимита" : `${config.avatarLimit} ${avatarWord(config.avatarLimit)}`;
   const queue = config.features.includes("PRIORITY_QUEUE") ? "приоритетная очередь" : "обычная очередь";
-  const style = config.features.includes("STYLE_COPY") ? "копирование стиля" : "AI-правки";
+  const style = config.features.includes("STYLE_COPY")
+    ? "свой стиль и копирование стиля"
+    : "AI-правки, без своего стиля";
   return [
     `${config.title} — ${formatRub(config.defaultPriceRub)} / месяц`,
     `• ${credits}`,
