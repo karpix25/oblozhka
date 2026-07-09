@@ -13,14 +13,18 @@ type TariffPackage = {
 
 export function tariffsMessage() {
   return [
-    "Тарифы:",
+    "Тарифы и цены:",
     "",
-    "Пробный доступ — 3 кредита для нового пользователя.",
+    `Пробный доступ — ${TRIAL_CREDITS} кредита`,
+    "Для нового пользователя.",
     "",
     ...PAID_PLAN_ORDER.flatMap((plan) => tariffLines(plan)),
-    "1 генерация = 1 кредит. 1 AI-правка готовой обложки = 1 кредит.",
-    "Кредиты Start и Pro обновляются каждый месяц и не переносятся.",
-    "Business получает безлимит по кредитам, но расход всё равно учитывается для аналитики."
+    "Как списываются кредиты:",
+    "1 генерация = 1 кредит.",
+    "1 AI-правка готовой обложки = 1 кредит.",
+    "",
+    "Кредиты Старт и Про обновляются каждый месяц и не переносятся.",
+    "Бизнес получает безлимит по кредитам, но расход всё равно учитывается для аналитики."
   ].join("\n");
 }
 
@@ -80,11 +84,18 @@ export function tariffPackagesKeyboard(packages: TariffPackage[]) {
 
 function tariffLines(plan: PaidPlan) {
   const config = PLAN_CONFIGS[plan];
-  const credits = config.monthlyCredits === null ? "безлимит кредитов" : `${config.monthlyCredits} кредитов / месяц`;
-  const avatars = config.avatarLimit === null ? "аватары без жесткого лимита" : `${config.avatarLimit} аватар${config.avatarLimit === 1 ? "" : "ов"}`;
+  const credits = config.monthlyCredits === null ? "безлимит кредитов" : `${config.monthlyCredits} кредитов в месяц`;
+  const avatars = config.avatarLimit === null ? "аватары без жесткого лимита" : `${config.avatarLimit} ${avatarWord(config.avatarLimit)}`;
   const queue = config.features.includes("PRIORITY_QUEUE") ? "приоритетная очередь" : "обычная очередь";
   const style = config.features.includes("STYLE_COPY") ? "копирование стиля" : "AI-правки";
-  return [`${config.title} — ${credits}`, `${avatars}, ${queue}, ${style}.`, ""];
+  return [
+    `${config.title} — ${formatRub(config.defaultPriceRub)} / месяц`,
+    `• ${credits}`,
+    `• ${avatars}`,
+    `• ${queue}`,
+    `• ${style}`,
+    ""
+  ];
 }
 
 function packageButtonLabel(pack: TariffPackage) {
@@ -98,4 +109,18 @@ function packageButtonLabel(pack: TariffPackage) {
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+}
+
+function formatRub(value: number) {
+  return new Intl.NumberFormat("ru-RU").format(value) + " ₽";
+}
+
+function avatarWord(count: number) {
+  if (count % 10 === 1 && count % 100 !== 11) {
+    return "аватар";
+  }
+  if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) {
+    return "аватара";
+  }
+  return "аватаров";
 }
