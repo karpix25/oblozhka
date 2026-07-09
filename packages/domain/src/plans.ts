@@ -1,6 +1,16 @@
 export type PaidPlan = "START" | "PRO" | "BUSINESS";
 
-export type PlanFeature = "AI_EDITING" | "STYLE_COPY" | "CUSTOM_STYLE_UPLOAD" | "PRIORITY_QUEUE";
+export type PlanFeature =
+  | "AI_EDITING"
+  | "STYLE_COPY"
+  | "CUSTOM_STYLE_UPLOAD"
+  | "REPLICATE_TEMPLATE"
+  | "FAST_GENERATION_2X"
+  | "FAST_GENERATION_4X"
+  | "AI_FILTERS"
+  | "FACE_EXPRESSIONS"
+  | "PRIORITY_SUPPORT"
+  | "PRIORITY_QUEUE";
 
 export type PlanConfig = {
   code: PaidPlan;
@@ -30,21 +40,31 @@ export const PLAN_CONFIGS: Record<PaidPlan, PlanConfig> = {
   PRO: {
     code: "PRO",
     title: "Про",
-    description: "500 кредитов в месяц, до 10 аватаров, AI-правки, копирование стиля и приоритетная очередь.",
+    description: "500 кредитов в месяц, до 10 аватаров, AI-правки, копирование стиля и ускоренная генерация.",
     monthlyCredits: 500,
     avatarLimit: 10,
     queuePriority: 10,
-    features: ["AI_EDITING", "STYLE_COPY", "CUSTOM_STYLE_UPLOAD", "PRIORITY_QUEUE"],
+    features: ["AI_EDITING", "STYLE_COPY", "CUSTOM_STYLE_UPLOAD", "REPLICATE_TEMPLATE", "FAST_GENERATION_2X", "PRIORITY_QUEUE"],
     defaultPriceRub: 3990
   },
   BUSINESS: {
     code: "BUSINESS",
     title: "Бизнес",
-    description: "Безлимитные кредиты, аватары без жесткого лимита, копирование стиля и максимальный приоритет.",
+    description: "Безлимитные кредиты, аватары без жесткого лимита, AI-фильтры, эмоции лица и максимальный приоритет.",
     monthlyCredits: null,
     avatarLimit: null,
     queuePriority: 1,
-    features: ["AI_EDITING", "STYLE_COPY", "CUSTOM_STYLE_UPLOAD", "PRIORITY_QUEUE"],
+    features: [
+      "AI_EDITING",
+      "STYLE_COPY",
+      "CUSTOM_STYLE_UPLOAD",
+      "REPLICATE_TEMPLATE",
+      "FAST_GENERATION_4X",
+      "AI_FILTERS",
+      "FACE_EXPRESSIONS",
+      "PRIORITY_SUPPORT",
+      "PRIORITY_QUEUE"
+    ],
     defaultPriceRub: 9900
   }
 };
@@ -61,4 +81,12 @@ export function isUnlimitedPlan(plan: PaidPlan): boolean {
 
 export function planHasFeature(plan: PaidPlan, feature: PlanFeature): boolean {
   return PLAN_CONFIGS[plan].features.includes(feature);
+}
+
+export function minPlanForFeature(feature: PlanFeature): PaidPlan {
+  const plan = PAID_PLAN_ORDER.find((candidate) => planHasFeature(candidate, feature));
+  if (!plan) {
+    throw new Error(`Feature ${feature} is not available in any paid plan`);
+  }
+  return plan;
 }

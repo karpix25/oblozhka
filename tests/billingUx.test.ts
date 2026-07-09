@@ -13,9 +13,10 @@ test("insufficient credits response gives a direct purchase path", () => {
 test("tariff text makes locked style and priority features clear", () => {
   const message = tariffsMessage();
 
-  assert.match(message, /AI-правки, без своего стиля/);
-  assert.match(message, /свой стиль и копирование стиля/);
-  assert.match(message, /приоритетная очередь/);
+  assert.match(message, /без своего стиля и копирования шаблона/);
+  assert.match(message, /свой стиль и копирование шаблона/);
+  assert.match(message, /AI-фильтры и эмоции лица/);
+  assert.match(message, /приоритетные функции и поддержка/);
 });
 
 test("avatar limit message points Start users to higher tiers", () => {

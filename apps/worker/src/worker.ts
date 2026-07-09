@@ -71,6 +71,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
     if (isDeliveredGeneration(generation)) {
       await notifier.sendGenerationResult(job.data.userTelegramId, {
         generationId: generation.id,
+        plan: generation.chargedPlan,
         previewUrl: generation.previewUrl,
         originalUrl: generation.originalUrl
       });
@@ -180,6 +181,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         }
         await notifier.sendGenerationResult(job.data.userTelegramId, {
           generationId: generation.id,
+          plan: generation.chargedPlan,
           previewUrl,
           originalUrl,
           previewBytes: preview,

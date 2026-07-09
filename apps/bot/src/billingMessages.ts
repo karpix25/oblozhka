@@ -94,17 +94,40 @@ function tariffLines(plan: PaidPlan) {
   const config = PLAN_CONFIGS[plan];
   const credits = config.monthlyCredits === null ? "безлимит кредитов" : `${config.monthlyCredits} кредитов в месяц`;
   const avatars = config.avatarLimit === null ? "аватары без жесткого лимита" : `${config.avatarLimit} ${avatarWord(config.avatarLimit)}`;
-  const queue = config.features.includes("PRIORITY_QUEUE") ? "приоритетная очередь" : "обычная очередь";
-  const style = config.features.includes("STYLE_COPY")
-    ? "свой стиль и копирование стиля"
-    : "AI-правки, без своего стиля";
   return [
     `${config.title} — ${formatRub(config.defaultPriceRub)} / месяц`,
     `• ${credits}`,
     `• ${avatars}`,
-    `• ${queue}`,
-    `• ${style}`,
+    ...featureLines(plan),
     ""
+  ];
+}
+
+function featureLines(plan: PaidPlan) {
+  if (plan === "START") {
+    return [
+      "• без водяного знака",
+      "• AI-правки готовой обложки",
+      "• Start-шаблоны",
+      "• без своего стиля и копирования шаблона",
+      "• обычная скорость генерации"
+    ];
+  }
+  if (plan === "PRO") {
+    return [
+      "• без водяного знака",
+      "• Start + Pro шаблоны",
+      "• свой стиль и копирование шаблона",
+      "• 2x быстрее генерация",
+      "• AI-правки готовой обложки"
+    ];
+  }
+  return [
+    "• без водяного знака",
+    "• все шаблоны и свой стиль",
+    "• AI-фильтры и эмоции лица",
+    "• 4x быстрее генерация",
+    "• приоритетные функции и поддержка"
   ];
 }
 

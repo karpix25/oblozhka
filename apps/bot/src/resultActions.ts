@@ -1,6 +1,11 @@
-import { createModernizedGeneration, findGeneration, prisma, upsertTelegramUser } from "@covers/db";
-import { getModernizationAction, type ModernizationActionId } from "@covers/domain";
-import type { Bot } from "grammy";
+import { createModernizedGeneration, findGeneration, getBillingAccess, prisma, upsertTelegramUser } from "@covers/db";
+import {
+  canUseEntitlement,
+  getModernizationAction,
+  modernizationActionLockedMessage,
+  type ModernizationActionId
+} from "@covers/domain";
+import { InlineKeyboard, type Bot } from "grammy";
 import type { BotAbuseGuard } from "./abuseGuard.js";
 import { insufficientCreditsMessage } from "./billingMessages.js";
 import { enqueueGenerationOrCompensate } from "./generationQueueing.js";
@@ -39,11 +44,20 @@ export function registerResultActionHandlers(bot: Bot<BotContext>, abuseGuard: B
       await ctx.answerCallbackQuery("Эту обложку пока нельзя улучшить.");
       return;
     }
+    const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
+    const access = await getBillingAccess(prisma, user.id);
+    const subject = access.kind === "subscription" ? { kind: "subscription" as const, plan: access.plan } : { kind: "trial" as const };
+    if (!canUseEntitlement(subject, action.requiredFeature)) {
+      await ctx.answerCallbackQuery();
+      await ctx.reply(modernizationActionLockedMessage(action), {
+        reply_markup: lockedModernizationKeyboard()
+      });
+      return;
+    }
     if (!(await abuseGuard.consume(ctx, "cover-generation"))) {
       return;
     }
 
-    const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
     try {
       const generation = await createModernizedGeneration(prisma, {
         sourceGenerationId: sourceGeneration.id,
@@ -64,4 +78,8 @@ export function registerResultActionHandlers(bot: Bot<BotContext>, abuseGuard: B
       });
     }
   });
+}
+
+function lockedModernizationKeyboard() {
+  return new InlineKeyboard().text("⭐ Выбрать тариф", "packages").row().text("💳 Все тарифы", "tariffs").text("🏠 В начало", "home");
 }

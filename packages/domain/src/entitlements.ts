@@ -11,7 +11,7 @@ export type SubscriptionEntitlementSubject = {
 
 export type EntitlementSubject = TrialEntitlementSubject | SubscriptionEntitlementSubject;
 
-export type EntitlementCode = Extract<PlanFeature, "STYLE_COPY" | "CUSTOM_STYLE_UPLOAD">;
+export type EntitlementCode = PlanFeature;
 
 export function canUseEntitlement(subject: EntitlementSubject, entitlement: EntitlementCode): boolean {
   if (subject.kind === "trial") {

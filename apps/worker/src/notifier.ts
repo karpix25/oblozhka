@@ -1,8 +1,9 @@
-import { MODERNIZATION_ACTIONS } from "@covers/domain";
+import { MODERNIZATION_ACTIONS, modernizationActionLabel, type PaidPlan } from "@covers/domain";
 import { Bot, InputFile } from "grammy";
 
 type GenerationDelivery = {
   generationId: string;
+  plan?: PaidPlan | null;
   previewUrl: string;
   originalUrl: string;
   previewBytes?: Buffer;
@@ -28,7 +29,7 @@ export class TelegramNotifier {
         hasPublicFinalUrl ? `Финальный файл: ${delivery.originalUrl}` : "Финальный PNG отправляю следующим сообщением."
       ].join("\n"),
       reply_markup: {
-        inline_keyboard: generationResultKeyboard(delivery.generationId)
+        inline_keyboard: generationResultKeyboard(delivery.generationId, delivery.plan)
       }
     });
 
@@ -65,11 +66,11 @@ export class TelegramNotifier {
   }
 }
 
-export function generationResultKeyboard(generationId: string) {
+export function generationResultKeyboard(generationId: string, plan?: PaidPlan | null) {
   return [
     [{ text: "Что улучшить?", callback_data: `modernize:noop:${generationId}` }],
     ...MODERNIZATION_ACTIONS.map((action) => [
-      { text: action.label, callback_data: `modernize:${action.id}:${generationId}` }
+      { text: modernizationActionLabel(action, plan), callback_data: `modernize:${action.id}:${generationId}` }
     ]),
     [{ text: "Создать еще обложку", callback_data: "project:start" }],
     [{ text: "Поддержка", callback_data: "support" }]
