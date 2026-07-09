@@ -1,4 +1,4 @@
-import type { ProjectPlatform, WizardInput } from "@covers/domain";
+import { getModernizationAction, type ModernizationActionId, type ProjectPlatform, type WizardInput } from "@covers/domain";
 import type { DbClient } from "./client.js";
 import { debitGenerationCreditInTransaction, refundGenerationCreditInTransaction } from "./credits.js";
 
@@ -104,6 +104,72 @@ export async function createGenerationFromProject(
       where: { id: input.projectId },
       data: { status: "GENERATION_PENDING" }
     });
+
+    return tx.generation.findUniqueOrThrow({ where: { id: generation.id } });
+  });
+}
+
+export async function createModernizedGeneration(
+  db: DbClient,
+  input: { sourceGenerationId: string; userId: string; actionId: ModernizationActionId; chargeCredits?: boolean }
+) {
+  return db.$transaction(async (tx) => {
+    const action = getModernizationAction(input.actionId);
+    if (!action) {
+      throw new Error("Unknown modernization action.");
+    }
+
+    const source = await tx.generation.findUniqueOrThrow({ where: { id: input.sourceGenerationId } });
+    if (source.userId !== input.userId) {
+      throw new Error("Generation does not belong to this user.");
+    }
+    if (source.status !== "SUCCEEDED" || !source.originalUrl) {
+      throw new Error("Generation is not ready for modernization.");
+    }
+
+    const creditCost = input.chargeCredits ? 1 : 0;
+    const generation = await tx.generation.create({
+      data: {
+        userId: source.userId,
+        projectId: source.projectId,
+        templateId: source.templateId,
+        userStyleAssetId: source.userStyleAssetId,
+        styleSource: source.styleSource,
+        hookCandidateId: source.hookCandidateId,
+        platform: source.platform,
+        format: source.format,
+        referenceMode: "REFERENCE",
+        referenceImageUrl: source.originalUrl,
+        guestFaceAssetId: source.guestFaceAssetId,
+        guestReferenceImageUrl: source.guestReferenceImageUrl,
+        topic: `${source.topic}. Задача модернизации: ${action.promptInstruction}`,
+        hookText: source.hookText,
+        niche: source.niche,
+        style: `${source.style}. Modernization: ${action.promptInstruction}`,
+        prompt: "Prompt will be planned by OpenRouter in the worker.",
+        creditCost
+      }
+    });
+
+    if (generation.creditCost > 0) {
+      const { access } = await debitGenerationCreditInTransaction(tx, {
+        userId: input.userId,
+        amount: generation.creditCost,
+        referenceId: generation.id,
+        note: `Image modernization: ${action.id}`
+      });
+      await tx.generation.update({
+        where: { id: generation.id },
+        data: generationBillingData(access)
+      });
+    }
+
+    if (source.projectId) {
+      await tx.project.update({
+        where: { id: source.projectId },
+        data: { status: "GENERATION_PENDING" }
+      });
+    }
 
     return tx.generation.findUniqueOrThrow({ where: { id: generation.id } });
   });

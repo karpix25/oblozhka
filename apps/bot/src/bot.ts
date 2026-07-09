@@ -32,6 +32,7 @@ import {
 import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
+import { registerResultActionHandlers } from "./resultActions.js";
 import { faceCardQueue, generationQueue, hookQueue } from "./queue.js";
 import { balanceKeyboard, backHomeKeyboard, insufficientCreditsKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
@@ -58,6 +59,7 @@ await seedDefaultTemplates(prisma);
 await seedDefaultTariffPackages(prisma);
 registerBillingHandlers(bot);
 registerProjectHandlers(bot, token, abuseGuard);
+registerResultActionHandlers(bot, abuseGuard);
 
 bot.command("start", async (ctx) => {
   await upsertTelegramUser(prisma, profileFromContext(ctx));

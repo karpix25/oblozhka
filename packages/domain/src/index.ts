@@ -3,6 +3,7 @@ export * from "./credits.js";
 export * from "./entitlements.js";
 export * from "./faceCards.js";
 export * from "./formats.js";
+export * from "./modernizationActions.js";
 export * from "./plans.js";
 export * from "./queues.js";
 export * from "./rateLimits.js";

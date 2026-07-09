@@ -1,6 +1,8 @@
+import { MODERNIZATION_ACTIONS } from "@covers/domain";
 import { Bot, InputFile } from "grammy";
 
 type GenerationDelivery = {
+  generationId: string;
   previewUrl: string;
   originalUrl: string;
   previewBytes?: Buffer;
@@ -26,10 +28,7 @@ export class TelegramNotifier {
         hasPublicFinalUrl ? `Финальный файл: ${delivery.originalUrl}` : "Финальный PNG отправляю следующим сообщением."
       ].join("\n"),
       reply_markup: {
-        inline_keyboard: [
-          [{ text: "Создать еще обложку", callback_data: "project:start" }],
-          [{ text: "Поддержка", callback_data: "support" }]
-        ]
+        inline_keyboard: generationResultKeyboard(delivery.generationId)
       }
     });
 
@@ -64,6 +63,17 @@ export class TelegramNotifier {
   async sendHookFailure(chatId: number) {
     await this.bot.api.sendMessage(chatId, "Не получилось подготовить текст для обложки. Если это ссылка или видео, попробуйте вставить текст ролика вручную.");
   }
+}
+
+export function generationResultKeyboard(generationId: string) {
+  return [
+    [{ text: "Что улучшить?", callback_data: `modernize:noop:${generationId}` }],
+    ...MODERNIZATION_ACTIONS.map((action) => [
+      { text: action.label, callback_data: `modernize:${action.id}:${generationId}` }
+    ]),
+    [{ text: "Создать еще обложку", callback_data: "project:start" }],
+    [{ text: "Поддержка", callback_data: "support" }]
+  ];
 }
 
 function photoInput(delivery: GenerationDelivery) {

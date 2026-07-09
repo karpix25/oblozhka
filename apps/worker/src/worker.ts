@@ -70,6 +70,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
 
     if (isDeliveredGeneration(generation)) {
       await notifier.sendGenerationResult(job.data.userTelegramId, {
+        generationId: generation.id,
         previewUrl: generation.previewUrl,
         originalUrl: generation.originalUrl
       });
@@ -178,6 +179,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           await markProjectStatus(prisma, generation.projectId, projectStatusAfterGeneration("SUCCEEDED"));
         }
         await notifier.sendGenerationResult(job.data.userTelegramId, {
+          generationId: generation.id,
           previewUrl,
           originalUrl,
           previewBytes: preview,
