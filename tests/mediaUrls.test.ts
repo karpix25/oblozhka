@@ -23,3 +23,10 @@ test("converts stored s3 URLs to public HTTPS URLs for Telegram", () => {
 test("keeps regular HTTP photo URLs unchanged", () => {
   assert.equal(toTelegramPhotoUrl("https://example.com/photo.png"), "https://example.com/photo.png");
 });
+
+test("does not reuse temporary Telegram bot file URLs as public photos", () => {
+  assert.equal(
+    toTelegramPhotoUrl("https://api.telegram.org/file/bot123:token/photos/file_6.jpg"),
+    null
+  );
+});

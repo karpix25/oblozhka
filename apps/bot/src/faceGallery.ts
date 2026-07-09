@@ -34,11 +34,16 @@ export async function sendFaceGallery(
   }
 
   if (photoUrl) {
-    await ctx.replyWithPhoto(photoUrl, { caption, reply_markup: keyboard });
-    return;
+    try {
+      await ctx.replyWithPhoto(photoUrl, { caption, reply_markup: keyboard });
+      return;
+    } catch {
+      // Some stored URLs are temporary Telegram file URLs or provider pages.
+      // Keep the user in the flow instead of failing the whole bot update.
+    }
   }
 
-  await ctx.reply(`${caption}\n\nНе получилось открыть изображение аватара. Загрузите новое фото.`, {
+  await ctx.reply(`${caption}\n\nКарта лица ещё готовится или временно недоступна. Попробуйте открыть аватары позже или загрузите новое фото.`, {
     reply_markup: keyboard
   });
 }
