@@ -1,12 +1,7 @@
 import { minPlanForFeature, planHasFeature, type PaidPlan, type PlanFeature } from "./plans.js";
 
 export type ModernizationActionId =
-  | "stronger_hook"
-  | "more_contrast"
-  | "clean_layout"
-  | "new_expression"
-  | "fresh_style"
-  | "ai_filter";
+  | "custom_edit";
 
 export type ModernizationAction = {
   id: ModernizationActionId;
@@ -18,46 +13,11 @@ export type ModernizationAction = {
 
 export const MODERNIZATION_ACTIONS: ModernizationAction[] = [
   {
-    id: "stronger_hook",
-    label: "🔥 Усилить текст",
-    queuedLabel: "усилю текст и драму",
+    id: "custom_edit",
+    label: "✍️ Описать правку",
+    queuedLabel: "внесу вашу правку",
     requiredFeature: "AI_EDITING",
-    promptInstruction: "Make the cover text more provocative, shorter and more clickable while keeping it truthful."
-  },
-  {
-    id: "more_contrast",
-    label: "🎨 Больше контраста",
-    queuedLabel: "усилю контраст и читаемость",
-    requiredFeature: "AI_EDITING",
-    promptInstruction: "Increase contrast, separation, color punch and small-screen readability without making the design noisy."
-  },
-  {
-    id: "clean_layout",
-    label: "✨ Почистить дизайн",
-    queuedLabel: "сделаю дизайн чище",
-    requiredFeature: "AI_EDITING",
-    promptInstruction: "Clean up the layout, reduce clutter, improve spacing and keep one clear focal subject."
-  },
-  {
-    id: "new_expression",
-    label: "😮 Другая эмоция",
-    queuedLabel: "поменяю эмоцию лица",
-    requiredFeature: "FACE_EXPRESSIONS",
-    promptInstruction: "Change the main face expression to a stronger emotion that fits the hook, while preserving identity."
-  },
-  {
-    id: "fresh_style",
-    label: "🔁 Повторить стиль",
-    queuedLabel: "сделаю свежий стиль",
-    requiredFeature: "REPLICATE_TEMPLATE",
-    promptInstruction: "Create a fresh stylistic variation of the same thumbnail idea while preserving the topic and main message."
-  },
-  {
-    id: "ai_filter",
-    label: "🎛 AI-фильтр",
-    queuedLabel: "применю AI-фильтр",
-    requiredFeature: "AI_FILTERS",
-    promptInstruction: "Apply a more cinematic AI filter treatment while keeping the thumbnail readable and commercially useful."
+    promptInstruction: "Apply the user's requested edit to the finished thumbnail while preserving the useful parts of the original image."
   }
 ];
 

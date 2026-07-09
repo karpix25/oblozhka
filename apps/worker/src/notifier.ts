@@ -68,7 +68,6 @@ export class TelegramNotifier {
 
 export function generationResultKeyboard(generationId: string, plan?: PaidPlan | null) {
   return [
-    [{ text: "Что улучшить?", callback_data: `modernize:noop:${generationId}` }],
     ...MODERNIZATION_ACTIONS.map((action) => [
       { text: modernizationActionLabel(action, plan), callback_data: `modernize:${action.id}:${generationId}` }
     ]),

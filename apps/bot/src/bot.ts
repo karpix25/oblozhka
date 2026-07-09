@@ -32,7 +32,7 @@ import {
 import { deleteCallbackMessage } from "./navigation.js";
 import { sendOnboarding } from "./onboarding.js";
 import { handleProjectPhoto, handleProjectText, registerProjectHandlers } from "./projectHandlers.js";
-import { registerResultActionHandlers } from "./resultActions.js";
+import { handleResultActionText, registerResultActionHandlers } from "./resultActions.js";
 import { faceCardQueue, generationQueue, hookQueue } from "./queue.js";
 import { balanceKeyboard, backHomeKeyboard, insufficientCreditsKeyboard, projectsKeyboard } from "./sectionKeyboards.js";
 import { type BotContext, initialSession, resetWizard } from "./session.js";
@@ -196,6 +196,7 @@ bot.on("message:photo", async (ctx) => {
 });
 
 bot.on("message:text", async (ctx) => {
+  if (await handleResultActionText(ctx, abuseGuard)) return;
   if (await handleLegacyReplyMenuText(ctx)) return;
   if (await handleProjectText(ctx, abuseGuard)) return;
 

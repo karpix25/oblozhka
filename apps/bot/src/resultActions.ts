@@ -9,22 +9,12 @@ import { InlineKeyboard, type Bot } from "grammy";
 import type { BotAbuseGuard } from "./abuseGuard.js";
 import { insufficientCreditsMessage } from "./billingMessages.js";
 import { enqueueGenerationOrCompensate } from "./generationQueueing.js";
-import { deleteCallbackMessage } from "./navigation.js";
 import { balanceKeyboard, insufficientCreditsKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 import { profileFromContext } from "./userProfile.js";
 
 export function registerResultActionHandlers(bot: Bot<BotContext>, abuseGuard: BotAbuseGuard) {
-  bot.callbackQuery(/^modernize:noop:(.+)$/, async (ctx) => {
-    await ctx.answerCallbackQuery("Выберите, что улучшить в обложке.");
-  });
-
   bot.callbackQuery(/^modernize:([^:]+):(.+)$/, async (ctx) => {
-    if (ctx.match[1] === "noop") {
-      await ctx.answerCallbackQuery("Выберите, что улучшить в обложке.");
-      return;
-    }
-
     const action = getModernizationAction(ctx.match[1]);
     if (!action) {
       await ctx.answerCallbackQuery("Такой правки больше нет.");
@@ -54,30 +44,81 @@ export function registerResultActionHandlers(bot: Bot<BotContext>, abuseGuard: B
       });
       return;
     }
-    if (!(await abuseGuard.consume(ctx, "cover-generation"))) {
-      return;
-    }
 
-    try {
-      const generation = await createModernizedGeneration(prisma, {
-        sourceGenerationId: sourceGeneration.id,
-        userId: user.id,
-        actionId: action.id as ModernizationActionId,
-        chargeCredits: true
-      });
-      await enqueueGenerationOrCompensate(generation, ctx.from.id);
-      await ctx.answerCallbackQuery();
-      await deleteCallbackMessage(ctx);
-      await ctx.reply(`Принял. Сейчас ${action.queuedLabel} и пришлю новый вариант.`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Не удалось запустить правку.";
-      const isInsufficientCredits = message === "Insufficient credits.";
-      await ctx.answerCallbackQuery();
-      await ctx.reply(isInsufficientCredits ? insufficientCreditsMessage() : message, {
-        reply_markup: isInsufficientCredits ? insufficientCreditsKeyboard() : balanceKeyboard()
-      });
-    }
+    ctx.session.step = "modernizationPrompt";
+    ctx.session.modernization = { generationId: sourceGeneration.id, actionId: action.id };
+    await ctx.answerCallbackQuery();
+    await ctx.reply("Опишите, что изменить в этой обложке. Например: «замени текст на ...», «сделай фон темнее», «добавь красную стрелку справа».", {
+      reply_markup: new InlineKeyboard().text("🏠 В начало", "home")
+    });
   });
+}
+
+export async function handleResultActionText(ctx: BotContext, abuseGuard: BotAbuseGuard) {
+  if (ctx.session.step !== "modernizationPrompt" || !ctx.session.modernization) {
+    return false;
+  }
+
+  const instruction = ctx.message?.text?.trim() ?? "";
+  if (instruction.length < 5) {
+    await ctx.reply("Напишите чуть подробнее, что именно изменить в обложке.", {
+      reply_markup: new InlineKeyboard().text("🏠 В начало", "home")
+    });
+    return true;
+  }
+
+  const action = getModernizationAction(ctx.session.modernization.actionId);
+  const sourceGeneration = await findGeneration(prisma, ctx.session.modernization.generationId);
+  if (!action || !sourceGeneration || sourceGeneration.status !== "SUCCEEDED" || !sourceGeneration.originalUrl) {
+    ctx.session.step = "idle";
+    ctx.session.modernization = undefined;
+    await ctx.reply("Эту обложку уже нельзя изменить. Попробуйте создать новую.", {
+      reply_markup: new InlineKeyboard().text("🎨 Создать обложку", "project:start")
+    });
+    return true;
+  }
+  if (sourceGeneration.user.telegramId !== BigInt(ctx.from!.id)) {
+    ctx.session.step = "idle";
+    ctx.session.modernization = undefined;
+    await ctx.reply("Это не ваша обложка.");
+    return true;
+  }
+
+  const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
+  const access = await getBillingAccess(prisma, user.id);
+  const subject = access.kind === "subscription" ? { kind: "subscription" as const, plan: access.plan } : { kind: "trial" as const };
+  if (!canUseEntitlement(subject, action.requiredFeature)) {
+    ctx.session.step = "idle";
+    ctx.session.modernization = undefined;
+    await ctx.reply(modernizationActionLockedMessage(action), {
+      reply_markup: lockedModernizationKeyboard()
+    });
+    return true;
+  }
+  if (!(await abuseGuard.consume(ctx, "cover-generation"))) {
+    return true;
+  }
+
+  try {
+    const generation = await createModernizedGeneration(prisma, {
+      sourceGenerationId: sourceGeneration.id,
+      userId: user.id,
+      actionId: action.id as ModernizationActionId,
+      userInstruction: instruction,
+      chargeOnSuccess: true
+    });
+    await enqueueGenerationOrCompensate(generation, ctx.from!.id);
+    ctx.session.step = "idle";
+    ctx.session.modernization = undefined;
+    await ctx.reply("Принял правку. Кредит спишется только если генерация успешно вернёт новую картинку.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Не удалось запустить правку.";
+    const isInsufficientCredits = message === "Insufficient credits.";
+    await ctx.reply(isInsufficientCredits ? insufficientCreditsMessage() : message, {
+      reply_markup: isInsufficientCredits ? insufficientCreditsKeyboard() : balanceKeyboard()
+    });
+  }
+  return true;
 }
 
 function lockedModernizationKeyboard() {

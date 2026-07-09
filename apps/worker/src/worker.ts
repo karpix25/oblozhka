@@ -1,4 +1,5 @@
 import {
+  chargeGenerationCreditOnSuccess,
   findGeneration,
   findProject,
   markGenerationFailed,
@@ -81,6 +82,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
     let persistedSuccess = false;
     await markGenerationProcessing(prisma, generation.id);
     const spec = getFormatSpec(generation.format);
+    const modernization = modernizationMeta(generation.providerMeta);
 
     try {
       await withJobDeadline("Generation job", positiveIntegerEnv("GENERATION_JOB_TIMEOUT_MS", 20 * 60 * 1000), async (signal) => {
@@ -124,6 +126,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           prompt: plan.prompt,
           referenceAnalysis: plan.referenceAnalysis,
           providerMeta: {
+            ...(modernization ? { modernization } : {}),
             promptPlannerModel: plan.model,
             promptValidationIssues: plan.validationIssues,
             templateReferenceUrl
@@ -170,10 +173,19 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         });
         throwIfAborted(signal, "Generation job");
 
+        const chargedGeneration = modernization?.chargeOnSuccess
+          ? await chargeGenerationCreditOnSuccess(prisma, generation.id, `Image edit: ${modernization.actionId}`)
+          : generation;
+        throwIfAborted(signal, "Generation job");
         await markGenerationSucceeded(prisma, generation.id, {
           originalUrl,
           previewUrl,
-          providerMeta: { imageModel: result.model, promptPlannerModel: plan.model, raw: result.raw }
+          providerMeta: {
+            ...(modernization ? { modernization } : {}),
+            imageModel: result.model,
+            promptPlannerModel: plan.model,
+            raw: result.raw
+          }
         });
         persistedSuccess = true;
         if (generation.projectId) {
@@ -181,7 +193,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         }
         await notifier.sendGenerationResult(job.data.userTelegramId, {
           generationId: generation.id,
-          plan: generation.chargedPlan,
+          plan: chargedGeneration.chargedPlan,
           previewUrl,
           originalUrl,
           previewBytes: preview,
@@ -215,6 +227,23 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
   })
 );
 attachWorkerLogging(GENERATION_QUEUE, generationWorker);
+
+function modernizationMeta(value: unknown) {
+  if (!value || typeof value !== "object" || !("modernization" in value)) {
+    return undefined;
+  }
+  const meta = (value as { modernization?: unknown }).modernization;
+  if (!meta || typeof meta !== "object") {
+    return undefined;
+  }
+  const record = meta as Record<string, unknown>;
+  return {
+    sourceGenerationId: typeof record.sourceGenerationId === "string" ? record.sourceGenerationId : undefined,
+    actionId: typeof record.actionId === "string" ? record.actionId : "custom_edit",
+    userInstruction: typeof record.userInstruction === "string" ? record.userInstruction : undefined,
+    chargeOnSuccess: record.chargeOnSuccess === true
+  };
+}
 
 const hookWorker = new Worker<HookJobData, void, string>(
   HOOK_QUEUE,

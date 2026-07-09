@@ -1,13 +1,24 @@
 import type { WizardInput } from "@covers/domain";
 import type { Context, SessionFlavor } from "grammy";
 
-export type WizardStep = "idle" | "sourceLink" | "sourceTranscript" | "sourceVideo" | "guestFaceUpload" | "referenceUpload" | "styleUpload" | "topic" | "hook";
+export type WizardStep =
+  | "idle"
+  | "sourceLink"
+  | "sourceTranscript"
+  | "sourceVideo"
+  | "guestFaceUpload"
+  | "referenceUpload"
+  | "styleUpload"
+  | "modernizationPrompt"
+  | "topic"
+  | "hook";
 
 export type BotSession = {
   step: WizardStep;
   projectId?: string;
   templateGalleryMode?: "browse" | "select";
   faceGalleryMode?: "browse" | "reference" | "guest";
+  modernization?: { generationId: string; actionId: string };
   draft?: Partial<WizardInput>;
 };
 
@@ -22,5 +33,6 @@ export function resetWizard(ctx: BotContext) {
   ctx.session.projectId = undefined;
   ctx.session.templateGalleryMode = undefined;
   ctx.session.faceGalleryMode = undefined;
+  ctx.session.modernization = undefined;
   ctx.session.draft = undefined;
 }

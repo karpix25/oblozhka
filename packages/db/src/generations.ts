@@ -111,7 +111,7 @@ export async function createGenerationFromProject(
 
 export async function createModernizedGeneration(
   db: DbClient,
-  input: { sourceGenerationId: string; userId: string; actionId: ModernizationActionId; chargeCredits?: boolean }
+  input: { sourceGenerationId: string; userId: string; actionId: ModernizationActionId; userInstruction: string; chargeOnSuccess?: boolean }
 ) {
   return db.$transaction(async (tx) => {
     const action = getModernizationAction(input.actionId);
@@ -127,7 +127,6 @@ export async function createModernizedGeneration(
       throw new Error("Generation is not ready for modernization.");
     }
 
-    const creditCost = input.chargeCredits ? 1 : 0;
     const generation = await tx.generation.create({
       data: {
         userId: source.userId,
@@ -142,27 +141,22 @@ export async function createModernizedGeneration(
         referenceImageUrl: source.originalUrl,
         guestFaceAssetId: source.guestFaceAssetId,
         guestReferenceImageUrl: source.guestReferenceImageUrl,
-        topic: `${source.topic}. Задача модернизации: ${action.promptInstruction}`,
+        topic: `Изменить готовую обложку. Пользователь просит: ${input.userInstruction}`,
         hookText: source.hookText,
         niche: source.niche,
-        style: `${source.style}. Modernization: ${action.promptInstruction}`,
+        style: `Сохрани основу готовой обложки. ${action.promptInstruction} User edit request: ${input.userInstruction}`,
         prompt: "Prompt will be planned by OpenRouter in the worker.",
-        creditCost
+        creditCost: 0,
+        providerMeta: {
+          modernization: {
+            sourceGenerationId: source.id,
+            actionId: action.id,
+            userInstruction: input.userInstruction,
+            chargeOnSuccess: Boolean(input.chargeOnSuccess)
+          }
+        }
       }
     });
-
-    if (generation.creditCost > 0) {
-      const { access } = await debitGenerationCreditInTransaction(tx, {
-        userId: input.userId,
-        amount: generation.creditCost,
-        referenceId: generation.id,
-        note: `Image modernization: ${action.id}`
-      });
-      await tx.generation.update({
-        where: { id: generation.id },
-        data: generationBillingData(access)
-      });
-    }
 
     if (source.projectId) {
       await tx.project.update({
@@ -172,6 +166,41 @@ export async function createModernizedGeneration(
     }
 
     return tx.generation.findUniqueOrThrow({ where: { id: generation.id } });
+  });
+}
+
+export async function chargeGenerationCreditOnSuccess(db: DbClient, id: string, note: string) {
+  return db.$transaction(async (tx) => {
+    const generation = await tx.generation.findUniqueOrThrow({ where: { id } });
+    if (generation.creditCost > 0) {
+      return generation;
+    }
+
+    const existingDebit = await tx.creditLedgerEntry.findFirst({
+      where: {
+        userId: generation.userId,
+        reason: "GENERATION_DEBIT",
+        referenceId: generation.id
+      }
+    });
+    if (existingDebit) {
+      return generation;
+    }
+
+    const { access } = await debitGenerationCreditInTransaction(tx, {
+      userId: generation.userId,
+      amount: 1,
+      referenceId: generation.id,
+      note
+    });
+
+    return tx.generation.update({
+      where: { id: generation.id },
+      data: {
+        creditCost: 1,
+        ...generationBillingData(access)
+      }
+    });
   });
 }
 
