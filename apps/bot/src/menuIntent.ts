@@ -4,6 +4,7 @@ export type MenuIntent =
   | "faces"
   | "styles"
   | "projects"
+  | "covers"
   | "tariffs"
   | "documents"
   | "balance"
@@ -15,6 +16,7 @@ const legacyLabels: Record<MenuIntent, string> = {
   faces: "👤 Лица",
   styles: "🎭 Мои стили",
   projects: "📁 Проекты",
+  covers: "🖼 Обложки",
   tariffs: "💳 Тарифы",
   documents: "📄 Документы",
   balance: "💎 Баланс",
@@ -27,6 +29,7 @@ const aliases: Array<{ intent: MenuIntent; values: string[] }> = [
   { intent: "faces", values: ["лица", "мои лица", "аватары", "мои аватары"] },
   { intent: "styles", values: ["стили", "мои стили", "свой стиль"] },
   { intent: "projects", values: ["проекты", "мои проекты"] },
+  { intent: "covers", values: ["обложки", "мои обложки", "история обложек", "готовые обложки"] },
   { intent: "tariffs", values: ["тарифы", "цены", "оплата", "купить"] },
   { intent: "documents", values: ["документы", "оферта", "политика", "соглашение"] },
   { intent: "balance", values: ["баланс", "кредиты", "мой баланс"] },

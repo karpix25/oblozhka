@@ -53,9 +53,9 @@ function faceGalleryKeyboard(input: { mode: FaceGalleryMode; page: number; total
 
   if (input.total > 1) {
     keyboard
-      .text("Назад", `faces:browse:${input.mode}:${input.page - 1}`)
-      .text(`${input.page + 1}/${input.total}`, "faces:noop")
-      .text("Вперёд", `faces:browse:${input.mode}:${input.page + 1}`)
+      .text("⬅️ Предыдущий", `faces:browse:${input.mode}:${input.page - 1}`)
+      .text(`${input.page + 1} из ${input.total}`, "faces:noop")
+      .text("Следующий ➡️", `faces:browse:${input.mode}:${input.page + 1}`)
       .row();
   }
 

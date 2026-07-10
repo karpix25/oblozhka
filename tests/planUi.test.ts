@@ -54,4 +54,8 @@ test("bot keyboards expose premium style entries instead of hiding them", () => 
     text: "🎭 Мой стиль ⭐ Pro",
     callback_data: "style-source:custom"
   });
+  assert.deepEqual(mainKeyboard(startAccess).inline_keyboard[3][0], {
+    text: "🖼 Мои обложки",
+    callback_data: "covers:mine"
+  });
 });

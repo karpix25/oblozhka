@@ -21,6 +21,12 @@ export function validateImagePrompt(prompt: string, input: PromptPlanningInput):
   if (input.templateReferenceImageUrl) {
     requireAny(normalized, ["template preview", "composition skeleton", "template image"], "template reference role", issues);
   }
+  if (input.wizard.guestReferenceImageUrl) {
+    requireAny(normalized, ["guest face", "image 2", "second uploaded face"], "guest face role", issues);
+  }
+  if (input.userStyle?.imageUrl) {
+    requireAny(normalized, ["user style reference", "custom style reference", "style reference"], "user style reference role", issues);
+  }
   requireAny(normalized, ["negative", "avoid", "do not", "no "], "negative rules", issues);
   requireAny(normalized, ["text zone", "text placement", "headline placement", "typography"], "text placement/typography", issues);
 
@@ -36,7 +42,10 @@ export function repairImagePrompt(prompt: string, input: PromptPlanningInput, is
     `Aspect ratio: ${input.aspectRatio}.`,
     input.template?.title ? `Selected template: ${input.template.title} (${input.template.slug ?? "unknown slug"}).` : "",
     input.wizard.hookText ? `Exact cover text policy: use the hook text "${input.wizard.hookText}" exactly unless the template says no overlay text.` : "",
+    input.designText?.summary ? `Typography contract: ${input.designText.summary}` : "",
     "Reference roles: Image 1 is the identity source of truth for the main person; keep the same person recognizable and preserve facial geometry, skin tone, eyes, nose, mouth, hairline and proportions as closely as possible.",
+    input.wizard.guestReferenceImageUrl ? "Guest face role: use Image 2 as a separate second person only; do not blend guest identity with Image 1." : "",
+    input.userStyle?.imageUrl ? "User style reference role: use the custom style reference for layout, typography, color and text zones only, never for identity." : "",
     "Template/style references control layout and design only. Do not borrow facial features, hair, expression, age, ethnicity or personal likeness from template/style references.",
     "Preserve text zones, typography feel, subject/object placement, color hierarchy, foreground/background depth.",
     "Negative rules: avoid clutter, tiny unreadable text, extra logos, watermarks, unrelated objects, and changing the selected template layout.",

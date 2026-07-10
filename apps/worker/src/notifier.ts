@@ -10,6 +10,11 @@ type GenerationDelivery = {
   originalBytes?: Buffer;
 };
 
+export type GenerationProgressMessage = {
+  chatId: number;
+  messageId: number;
+};
+
 export class TelegramNotifier {
   private readonly bot: Bot;
 
@@ -41,6 +46,21 @@ export class TelegramNotifier {
     }
   }
 
+  async sendGenerationProgress(chatId: number, text = generationProgressText("Анализирую референсы и дизайн")) {
+    const message = await this.bot.api.sendMessage(chatId, text);
+    return { chatId, messageId: message.message_id };
+  }
+
+  async updateGenerationProgress(progress: GenerationProgressMessage | undefined, stage: string) {
+    if (!progress) return;
+    await this.bot.api.editMessageText(progress.chatId, progress.messageId, generationProgressText(stage)).catch(() => undefined);
+  }
+
+  async finishGenerationProgress(progress: GenerationProgressMessage | undefined) {
+    if (!progress) return;
+    await this.bot.api.deleteMessage(progress.chatId, progress.messageId).catch(() => undefined);
+  }
+
   async sendGenerationFailure(chatId: number) {
     await this.bot.api.sendMessage(
       chatId,
@@ -64,6 +84,15 @@ export class TelegramNotifier {
   async sendHookFailure(chatId: number) {
     await this.bot.api.sendMessage(chatId, "Не получилось подготовить текст для обложки. Если это ссылка или видео, попробуйте вставить текст ролика вручную.");
   }
+}
+
+function generationProgressText(stage: string) {
+  return [
+    "⏳ Обложка в работе",
+    "",
+    `Сейчас: ${stage}.`,
+    "Я пришлю результат сюда, когда генерация завершится."
+  ].join("\n");
 }
 
 export function generationResultKeyboard(generationId: string, plan?: PaidPlan | null) {

@@ -2,6 +2,7 @@ import {
   createProject,
   findProject,
   getBillingAccess,
+  listUserSucceededGenerations,
   listUserFaceAssets,
   listTemplates,
   prisma,
@@ -14,6 +15,7 @@ import {
 import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
 import type { BotAbuseGuard } from "./abuseGuard.js";
+import { sendCoverGallery } from "./coverGallery.js";
 import { openFaceLibrary } from "./faceLibrary.js";
 import { platformKeyboard, sourceTypeKeyboard, styleSourceKeyboard } from "./keyboards.js";
 import { askGuestFace, requiresGuestFace, saveUploadedGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
@@ -45,6 +47,19 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
 
   bot.callbackQuery("projects:mine", async (ctx) => {
     await sendProjectList(ctx, { fromCallback: true });
+  });
+
+  bot.callbackQuery("covers:mine", async (ctx) => {
+    await openCoverHistory(ctx, { fromCallback: true });
+  });
+
+  bot.callbackQuery(/^covers:browse:(-?\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await openCoverHistory(ctx, { page: Number(ctx.match[1]), replace: true });
+  });
+
+  bot.callbackQuery("covers:noop", async (ctx) => {
+    await ctx.answerCallbackQuery();
   });
 
   bot.callbackQuery("faces:mine", async (ctx) => {
@@ -238,6 +253,21 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
       url: file.file_path ? telegramFileUrl(token, file.file_path) : undefined,
       metadata: { duration: ctx.message.video.duration, fileSize: ctx.message.video.file_size }
     });
+  });
+}
+
+export async function openCoverHistory(ctx: BotContext, input: { fromCallback?: boolean; page?: number; replace?: boolean } = {}) {
+  const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
+  const access = await getBillingAccess(prisma, user.id);
+  const covers = await listUserSucceededGenerations(prisma, { userId: user.id, take: 20 });
+  if (input.fromCallback) {
+    await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+  }
+  await sendCoverGallery(ctx, covers, {
+    page: input.page,
+    replace: input.replace,
+    plan: access.kind === "subscription" ? access.plan : null
   });
 }
 

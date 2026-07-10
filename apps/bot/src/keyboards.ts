@@ -12,6 +12,8 @@ export function mainKeyboard(access?: BillingAccess) {
     .row()
     .text("🖼 Шаблоны", "templates:library")
     .text("📁 Мои проекты", "projects:mine")
+    .row()
+    .text("🖼 Мои обложки", "covers:mine")
     .text("💎 Баланс", "balance")
     .row()
     .text("💳 Тарифы", "tariffs")

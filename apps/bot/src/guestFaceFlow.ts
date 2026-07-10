@@ -8,7 +8,7 @@ import {
   updateUserFaceAssetUrl,
   upsertTelegramUser
 } from "@covers/db";
-import { isGeneratedFaceCardMetadata } from "@covers/domain";
+import { designRequiresGuestFace, isGeneratedFaceCardMetadata } from "@covers/domain";
 import { avatarLimitMessage } from "./billingMessages.js";
 import { createQueuedFaceAsset } from "./faceAssetUploads.js";
 import { sendFaceGallery } from "./faceGallery.js";
@@ -17,7 +17,7 @@ import { backHomeKeyboard } from "./sectionKeyboards.js";
 import { profileFromContext } from "./userProfile.js";
 
 export function requiresGuestFace(template?: { slug?: string | null } | null) {
-  return template?.slug === "podcast-countdown";
+  return designRequiresGuestFace(template);
 }
 
 export async function askGuestFace(ctx: BotContext) {
@@ -96,9 +96,10 @@ export async function saveUploadedGuestFace(ctx: BotContext, token: string) {
 
 function guestFacePrompt() {
   return [
-    "Для Podcast Countdown нужно второе лицо.",
+    "Для этого дизайн-референса нужно второе лицо.",
     "",
     "Выберите сохранённого гостя или загрузите новое фото лица.",
+    "Я не буду брать лицо второго человека из шаблона — нужен отдельный референс.",
     "Лучше: крупное лицо, нормальный свет, без сильных фильтров."
   ].join("\n");
 }

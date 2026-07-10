@@ -76,9 +76,15 @@ export class OpenRouterPromptPlanner {
     theme?: string;
     templateTitle?: string;
     templateRules?: string;
+    designText?: {
+      maxWords?: number;
+      textPlacement?: string;
+      typography?: string;
+      summary: string;
+    };
   }, options: OpenRouterRequestOptions = {}): Promise<HookCandidate[]> {
     const hookContext = buildHookContext({ transcript: input.transcript, theme: input.theme });
-    const maxWords = deriveMaxHookWords(input.templateRules);
+    const maxWords = input.designText?.maxWords ?? deriveMaxHookWords(input.templateRules);
 
     if (!this.apiKey) {
       return this.fallbackHooks(hookContext, maxWords);
@@ -116,6 +122,11 @@ export class OpenRouterPromptPlanner {
                 `Тема: ${input.theme ?? "не указана"}.`,
                 `Шаблон: ${input.templateTitle ?? "не выбран"}.`,
                 `Правила шаблона: ${input.templateRules ?? "нет"}.`,
+                input.designText?.summary ? `Ограничения дизайна для текста: ${input.designText.summary}` : "",
+                input.designText?.maxWords ? `Жёсткий лимит: максимум ${input.designText.maxWords} слов в хуке.` : "",
+                input.designText?.textPlacement ? `Зона текста: ${input.designText.textPlacement}.` : "",
+                input.designText?.typography ? `Типографика референса: ${input.designText.typography}.` : "",
+                "Не предлагай хук, который не поместится в выбранный дизайн или сломает композицию.",
                 "Текст ролика:",
                 input.transcript.slice(0, 12000)
               ].join("\n")
@@ -165,6 +176,7 @@ export class OpenRouterPromptPlanner {
           `Ниша: ${input.wizard.niche}.`,
           `Стиль: ${input.wizard.style}.`,
           templateGuide,
+          this.designTextGuide(input),
           roleContract,
           `Текст на обложке: ${input.wizard.hookText || "без текста"}.`,
           input.wizard.guestReferenceImageUrl
@@ -239,6 +251,7 @@ export class OpenRouterPromptPlanner {
         `Create a high-converting ${input.formatDescription} thumbnail, aspect ratio ${input.aspectRatio}.`,
         `Topic: ${input.wizard.topic}. Niche: ${input.wizard.niche}. ${templateRule}`,
         referenceRoleContract(input),
+        input.designText?.summary ? `Design text contract: ${input.designText.summary}` : "",
         faceRule,
         input.wizard.guestReferenceImageUrl ? "Use the second uploaded face as a separate guest/person in the composition." : "",
         "Template/style references control layout and design only; do not borrow facial features from them.",
@@ -273,6 +286,19 @@ export class OpenRouterPromptPlanner {
       "Шаблон не является face reference: не брать с него черты лица, волосы, выражение, возраст, этничность или персональное сходство.",
       "Эти правила важнее общих эстетических пожеланий."
     ].join("\n");
+  }
+
+  private designTextGuide(input: PromptPlanningInput) {
+    if (!input.designText?.summary) return "";
+    return [
+      "Typography and hook-fit contract:",
+      input.designText.summary,
+      input.designText.maxWords ? `Do not exceed ${input.designText.maxWords} words for the main cover text.` : "",
+      input.designText.textPlacement ? `Keep text inside this zone: ${input.designText.textPlacement}.` : "",
+      input.designText.typography ? `Match this typography mechanic: ${input.designText.typography}.` : "",
+      "When a template preview or user style image is attached, visually inspect its typography: font family feel, weight, casing, line breaks, outline, shadow, fill color, stroke color, spacing and text block proportions.",
+      "Preserve the reference's font weight, casing, line count, outline/shadow feel, color hierarchy and text block scale."
+    ].filter(Boolean).join("\n");
   }
 
   private validatedPlan(prompt: string, input: PromptPlanningInput, referenceAnalysis: string | undefined, model: string): PromptPlan {

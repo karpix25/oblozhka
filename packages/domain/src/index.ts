@@ -1,5 +1,6 @@
 export * from "./catalog.js";
 export * from "./credits.js";
+export * from "./designConstraints.js";
 export * from "./entitlements.js";
 export * from "./faceCards.js";
 export * from "./formats.js";

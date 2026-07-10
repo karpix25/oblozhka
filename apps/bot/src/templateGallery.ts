@@ -87,9 +87,9 @@ function templateGalleryKeyboard(input: {
 
   if (input.total > 1) {
     keyboard
-      .text("Назад", `templates:browse:${input.platform}:${input.page - 1}`)
-      .text(`${input.page + 1}/${input.total}`, `templates:noop`)
-      .text("Вперёд", `templates:browse:${input.platform}:${input.page + 1}`)
+      .text("⬅️ Предыдущий", `templates:browse:${input.platform}:${input.page - 1}`)
+      .text(`${input.page + 1} из ${input.total}`, `templates:noop`)
+      .text("Следующий ➡️", `templates:browse:${input.platform}:${input.page + 1}`)
       .row();
   }
 

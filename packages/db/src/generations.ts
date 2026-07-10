@@ -1,4 +1,4 @@
-import { getModernizationAction, type ModernizationActionId, type ProjectPlatform, type WizardInput } from "@covers/domain";
+import { designRequiresGuestFace, getModernizationAction, type ModernizationActionId, type ProjectPlatform, type WizardInput } from "@covers/domain";
 import { serializeAdminUser } from "./adminSerializers.js";
 import type { DbClient } from "./client.js";
 import { debitGenerationCreditInTransaction, refundGenerationCreditInTransaction } from "./credits.js";
@@ -60,6 +60,9 @@ export async function createGenerationFromProject(
 
     if (!project.selectedHook || !project.platform || (!project.selectedTemplate && !project.selectedUserStyleAsset)) {
       throw new Error("Project must have platform, style/template and selected hook before generation.");
+    }
+    if (designRequiresGuestFace(project.selectedTemplate) && !project.guestFaceAsset) {
+      throw new Error("This template requires a second face reference.");
     }
 
     const format = formatForPlatform(project.platform);
@@ -292,4 +295,18 @@ export async function listGenerations(db: DbClient) {
     ...generation,
     user: serializeAdminUser(generation.user)
   }));
+}
+
+export async function listUserSucceededGenerations(db: DbClient, input: { userId: string; take?: number }) {
+  return db.generation.findMany({
+    where: {
+      userId: input.userId,
+      status: "SUCCEEDED",
+      previewUrl: { not: null },
+      originalUrl: { not: null }
+    },
+    orderBy: { createdAt: "desc" },
+    take: input.take ?? 20,
+    include: { template: true, userStyleAsset: true }
+  });
 }

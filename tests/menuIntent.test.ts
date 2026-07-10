@@ -13,6 +13,8 @@ test("menuIntentFromText accepts natural user fallback phrases", () => {
   assert.equal(menuIntentFromText("Создать обложку"), "create");
   assert.equal(menuIntentFromText("сделать обложку"), "create");
   assert.equal(menuIntentFromText("мои лица"), "faces");
+  assert.equal(menuIntentFromText("мои обложки"), "covers");
+  assert.equal(menuIntentFromText("история обложек"), "covers");
   assert.equal(menuIntentFromText("свой стиль"), "styles");
   assert.equal(menuIntentFromText("как это работает"), "help");
 });

@@ -13,6 +13,21 @@ test("reference role contract keeps face identity separate from template referen
   assert.match(contract, /Template\/style references control layout and design only/i);
 });
 
+test("reference role contract treats user style images as design only", () => {
+  const contract = referenceRoleContract({
+    ...promptInput(),
+    userStyle: {
+      title: "User style",
+      promptRules: "Keep the same typography.",
+      imageUrl: "https://example.com/style.png"
+    }
+  });
+
+  assert.match(contract, /User style reference image/i);
+  assert.match(contract, /design-only source/i);
+  assert.match(contract, /never an identity source/i);
+});
+
 test("prompt repair block restores strict face identity rules", () => {
   const input = promptInput();
   const prompt = [

@@ -36,4 +36,11 @@ export type PromptPlanningInput = {
     promptRules?: string | null;
     imageUrl?: string | null;
   };
+  designText?: {
+    maxWords?: number;
+    textPlacement?: string;
+    typography?: string;
+    summary: string;
+    requiresGuestFace?: boolean;
+  };
 };

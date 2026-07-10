@@ -15,6 +15,7 @@ import {
   FACE_CARD_QUEUE,
   GENERATION_QUEUE,
   HOOK_QUEUE,
+  deriveDesignTextConstraints,
   getFormatSpec,
   type FaceCardJobData,
   type GenerationJobData,
@@ -81,17 +82,21 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
 
     let persistedSuccess = false;
     await markGenerationProcessing(prisma, generation.id);
+    const progress = await notifier.sendGenerationProgress(job.data.userTelegramId).catch(() => undefined);
     const spec = getFormatSpec(generation.format);
     const modernization = modernizationMeta(generation.providerMeta);
 
     try {
       await withJobDeadline("Generation job", positiveIntegerEnv("GENERATION_JOB_TIMEOUT_MS", 20 * 60 * 1000), async (signal) => {
+        await notifier.updateGenerationProgress(progress, "готовлю дизайн-референсы");
         const templateReferenceUrl = await prepareTemplateReferenceUrl({
           generationId: generation.id,
           templateSlug: generation.template?.slug,
           storage
         });
         throwIfAborted(signal, "Generation job");
+        const designText = deriveDesignTextConstraints(generation.template ?? generation.userStyleAsset ?? undefined);
+        await notifier.updateGenerationProgress(progress, "анализирую типографику и собираю prompt");
         const plan = await promptPlanner.plan({
           wizard: {
             format: generation.format,
@@ -119,7 +124,8 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
                 promptRules: generation.userStyleAsset.promptRules,
                 imageUrl: generation.userStyleAsset.imageUrl ?? generation.userStyleAsset.sourceImageUrl
               }
-            : undefined
+            : undefined,
+          designText
         }, { signal });
         throwIfAborted(signal, "Generation job");
         await updateGenerationPrompt(prisma, generation.id, {
@@ -147,6 +153,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           ...(styleReferenceUrl ? [styleReferenceUrl] : [])
         ];
 
+        await notifier.updateGenerationProgress(progress, "генерирую финальную обложку");
         const result = await imageClient.generate({
           prompt: plan.prompt,
           imageUrl: imageReferenceUrls[0],
@@ -155,6 +162,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           signal
         });
         throwIfAborted(signal, "Generation job");
+        await notifier.updateGenerationProgress(progress, "сохраняю PNG и превью");
         const finalImage = await normalizeFinal(result.bytes, spec.width, spec.height);
         throwIfAborted(signal, "Generation job");
         const preview = await createPreview(finalImage, Math.round(spec.width / 2), Math.round(spec.height / 2));
@@ -218,6 +226,8 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         await notifier.sendGenerationFailure(job.data.userTelegramId);
       }
       throw error;
+    } finally {
+      await notifier.finishGenerationProgress(progress);
     }
   },
   buildWorkerOptions({
@@ -259,11 +269,14 @@ const hookWorker = new Worker<HookJobData, void, string>(
         const transcript = await ensureProjectTranscript(project, signal);
         throwIfAborted(signal, "Hook job");
         const textForHooks = transcript ?? "Пользователь загрузил видео без транскрипта.";
+        const designText = deriveDesignTextConstraints(project.selectedTemplate ?? project.selectedUserStyleAsset ?? undefined);
         const hooks = await promptPlanner.generateHooks({
           transcript: textForHooks,
           platform: project.platform ?? "YOUTUBE",
+          theme: project.topicSummary ?? project.transcripts[0]?.cleanText?.slice(0, 300) ?? undefined,
           templateTitle: project.selectedTemplate?.title ?? project.selectedUserStyleAsset?.title ?? undefined,
-          templateRules: project.selectedTemplate?.promptRules ?? project.selectedUserStyleAsset?.promptRules ?? undefined
+          templateRules: project.selectedTemplate?.promptRules ?? project.selectedUserStyleAsset?.promptRules ?? undefined,
+          designText
         }, { signal });
         throwIfAborted(signal, "Hook job");
         const savedHooks = await replaceProjectHooks(prisma, project.id, hooks);

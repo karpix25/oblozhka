@@ -4,6 +4,7 @@ import { documentsKeyboard, supportMessage, tariffsMessage } from "./compliance.
 import { openFaceLibrary } from "./faceLibrary.js";
 import { sourceTypeKeyboard } from "./keyboards.js";
 import { sourceStartMessage } from "./messages.js";
+import { openCoverHistory } from "./projectHandlers.js";
 import { sendProjectList } from "./projectList.js";
 import { balanceKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
 import { menuIntentFromText } from "./menuIntent.js";
@@ -52,6 +53,11 @@ export async function handleLegacyReplyMenuText(ctx: BotContext) {
 
   if (intent === "projects") {
     await sendProjectList(ctx);
+    return true;
+  }
+
+  if (intent === "covers") {
+    await openCoverHistory(ctx);
     return true;
   }
 
