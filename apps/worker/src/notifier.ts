@@ -1,5 +1,6 @@
 import { MODERNIZATION_ACTIONS, modernizationActionLabel, type PaidPlan } from "@covers/domain";
 import { Bot, InputFile } from "grammy";
+import { generationProgressText, type GenerationProgressStage } from "./generationProgress.js";
 import { hookProgressText, type HookProgressStage } from "./hookProgress.js";
 
 type GenerationDelivery = {
@@ -47,18 +48,18 @@ export class TelegramNotifier {
     }
   }
 
-  async sendGenerationProgress(chatId: number, text = generationProgressText("Анализирую референсы и дизайн")) {
-    const message = await this.bot.api.sendMessage(chatId, text);
+  async sendGenerationProgress(chatId: number) {
+    const message = await this.bot.api.sendMessage(chatId, generationProgressText("references"));
     return { chatId, messageId: message.message_id };
   }
 
-  async updateGenerationProgress(progress: GenerationProgressMessage | undefined, stage: string) {
+  async updateGenerationProgress(progress: GenerationProgressMessage | undefined, stage: GenerationProgressStage) {
     if (!progress) return;
     await this.bot.api.editMessageText(progress.chatId, progress.messageId, generationProgressText(stage)).catch(() => undefined);
   }
 
-  async finishGenerationProgress(progress: GenerationProgressMessage | undefined) {
-    if (!progress) return;
+  async finishGenerationProgress(progress: GenerationProgressMessage | undefined, completed = false) {
+    if (!progress || completed) return;
     await this.bot.api.deleteMessage(progress.chatId, progress.messageId).catch(() => undefined);
   }
 
@@ -103,7 +104,7 @@ export class TelegramNotifier {
 
   async finishHookProgress(progress: GenerationProgressMessage | undefined, completed: boolean) {
     if (completed) return;
-    await this.finishGenerationProgress(progress);
+    await this.finishGenerationProgress(progress, false);
   }
 
   async sendHookFailure(chatId: number, projectId: string) {
@@ -120,15 +121,6 @@ export class TelegramNotifier {
       }
     });
   }
-}
-
-function generationProgressText(stage: string) {
-  return [
-    "⏳ Обложка в работе",
-    "",
-    `Сейчас: ${stage}.`,
-    "Я пришлю результат сюда, когда генерация завершится."
-  ].join("\n");
 }
 
 function recoveryKeyboard(projectId?: string | null) {

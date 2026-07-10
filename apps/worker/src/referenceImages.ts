@@ -17,9 +17,16 @@ export async function prepareReferenceImageUrls(input: {
 }
 
 async function mirrorReferenceImage(storage: ObjectStorage, generationId: string, url: string, index: number, signal?: AbortSignal) {
-  if (!url.startsWith("http")) return url;
+  const publicUrl = storage.publicUrlFor(url);
+  if (url.startsWith("s3://")) {
+    if (!publicUrl.startsWith("https://")) {
+      throw new Error("S3_PUBLIC_BASE_URL is required to use stored reference images with external AI providers.");
+    }
+    return publicUrl;
+  }
+  if (!publicUrl.startsWith("http")) return publicUrl;
 
-  const downloaded = await downloadReferenceImage(url, signal);
+  const downloaded = await downloadReferenceImage(publicUrl, signal);
   const imageMime = detectImageMime(downloaded.body, downloaded.contentType);
   if (!imageMime) {
     throw new Error(`Reference URL did not return a supported image: ${downloaded.contentType ?? "unknown"}`);
@@ -37,7 +44,7 @@ async function mirrorReferenceImage(storage: ObjectStorage, generationId: string
       index,
       storageUrlScheme: mirroredUrl.split(":")[0] || "unknown"
     });
-    return url;
+    return publicUrl;
   }
 
   return mirroredUrl;

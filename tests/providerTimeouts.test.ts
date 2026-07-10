@@ -44,6 +44,31 @@ test("openrouter retries retryable responses before parsing a prompt plan", asyn
   });
 });
 
+test("openrouter prompt planning falls back after an invalid provider response", async () => {
+  await withFetch(async () =>
+    new Response(JSON.stringify({
+      error: { message: "Invalid URL format: s3://covers/user-faces/face.png" }
+    }), { status: 400 }), async () => {
+    const planner = new OpenRouterPromptPlanner({ apiKey: "test-key", model: "test-model", timeoutMs: 1000 });
+    const plan = await planner.plan({
+      wizard: {
+        format: "YOUTUBE",
+        referenceMode: "FACE",
+        referenceImageUrl: "https://cdn.example.com/user-faces/face.png",
+        topic: "Запуск продукта",
+        niche: "Бизнес",
+        hookText: "ОШИБКА В ЗАПУСКЕ",
+        style: "Контраст"
+      },
+      formatDescription: "YouTube cover",
+      aspectRatio: "16:9"
+    });
+
+    assert.equal(plan.model, "fallback");
+    assert.match(plan.prompt, /ОШИБКА В ЗАПУСКЕ/);
+  });
+});
+
 test("openrouter hook generation falls back after provider failures", async () => {
   let calls = 0;
 

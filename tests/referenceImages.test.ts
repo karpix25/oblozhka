@@ -22,6 +22,7 @@ test("reference image mirroring rejects oversized content length", async () => {
           generationId: "gen-1",
           urls: ["https://example.com/ref.png"],
           storage: {
+            publicUrlFor: (url: string) => url,
             uploadBuffer: async () => "https://cdn.example.com/ref.png"
           } as never
         }),
@@ -31,4 +32,32 @@ test("reference image mirroring rejects oversized content length", async () => {
     globalThis.fetch = previousFetch;
     process.env.REFERENCE_IMAGE_MAX_BYTES = previousMaxBytes;
   }
+});
+
+test("stored S3 reference is converted to configured public HTTPS URL", async () => {
+  const urls = await prepareReferenceImageUrls({
+    generationId: "gen-1",
+    urls: ["s3://covers/user-faces/face.png"],
+    storage: {
+      publicUrlFor: () => "https://cdn.example.com/covers/user-faces/face.png",
+      uploadBuffer: async () => {
+        throw new Error("Stored S3 references should not be uploaded again.");
+      }
+    } as never
+  });
+
+  assert.deepEqual(urls, ["https://cdn.example.com/covers/user-faces/face.png"]);
+});
+
+test("stored S3 reference fails early when no public URL is configured", async () => {
+  await assert.rejects(
+    prepareReferenceImageUrls({
+      generationId: "gen-1",
+      urls: ["s3://covers/user-faces/face.png"],
+      storage: {
+        publicUrlFor: (url: string) => url
+      } as never
+    }),
+    /S3_PUBLIC_BASE_URL is required/
+  );
 });

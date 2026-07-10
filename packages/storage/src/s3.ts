@@ -51,4 +51,15 @@ export class ObjectStorage {
     }
     return `s3://${this.bucket}/${key}`;
   }
+
+  publicUrlFor(url: string): string {
+    if (/^https?:\/\//i.test(url)) return url;
+
+    const match = url.match(/^s3:\/\/([^/]+)\/(.+)$/);
+    if (!match || match[1] !== this.bucket || !this.publicBaseUrl) {
+      return url;
+    }
+
+    return `${this.publicBaseUrl.replace(/\/$/, "")}/${match[2]}`;
+  }
 }

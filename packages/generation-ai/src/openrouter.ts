@@ -33,38 +33,49 @@ export class OpenRouterPromptPlanner {
     }
 
     const messages = this.messages(input);
-    const response = await fetchOpenRouterText(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${this.apiKey}`,
-          "content-type": "application/json",
-          "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
-          "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+    let response: Awaited<ReturnType<typeof fetchOpenRouterText>>;
+    try {
+      response = await fetchOpenRouterText(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${this.apiKey}`,
+            "content-type": "application/json",
+            "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
+            "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+          },
+          body: JSON.stringify({
+            model: this.model,
+            messages,
+            temperature: 0.35,
+            response_format: { type: "json_object" }
+          })
         },
-        body: JSON.stringify({
-          model: this.model,
-          messages,
-          temperature: 0.35,
-          response_format: { type: "json_object" }
-        })
-      },
-      {
-        description: "OpenRouter prompt planning",
-        signal: options.signal,
-        timeoutMs: this.timeoutMs
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`OpenRouter prompt planning failed: ${response.status} ${response.text}`);
+        {
+          description: "OpenRouter prompt planning",
+          signal: options.signal,
+          timeoutMs: this.timeoutMs
+        }
+      );
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      return this.fallbackPlan(input);
     }
 
-    const json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
+    if (!response.ok) {
+      return this.fallbackPlan(input);
+    }
+
+    let json: { choices?: Array<{ message?: { content?: string } }> };
+    try {
+      json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
+    } catch {
+      return this.fallbackPlan(input);
+    }
     const content = json.choices?.[0]?.message?.content;
     if (!content) {
-      throw new Error("OpenRouter returned an empty prompt plan.");
+      return this.fallbackPlan(input);
     }
 
     return this.parsePlan(content, input);

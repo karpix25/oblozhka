@@ -28,10 +28,10 @@ import { SourceIngestionService } from "@covers/media-source";
 import { ObjectStorage } from "@covers/storage";
 import { Worker } from "bullmq";
 import { processFaceCardJob } from "./faceCardProcessor.js";
+import { prepareGenerationReferences } from "./generationReferences.js";
 import { createPreview, normalizeFinal } from "./imageProcessing.js";
 import { TelegramNotifier } from "./notifier.js";
 import { projectStatusAfterGeneration } from "./projectStatus.js";
-import { prepareReferenceImageUrls } from "./referenceImages.js";
 import { prepareTemplateReferenceUrl } from "./templateReference.js";
 import {
   attachWorkerLogging,
@@ -83,6 +83,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
     }
 
     let persistedSuccess = false;
+    let generationProgressCompleted = false;
     await markGenerationProcessing(prisma, generation.id);
     await trackProductEvent({
       name: "generation_started",
@@ -96,7 +97,16 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
 
     try {
       await withJobDeadline("Generation job", positiveIntegerEnv("GENERATION_JOB_TIMEOUT_MS", 20 * 60 * 1000), async (signal) => {
-        await notifier.updateGenerationProgress(progress, "готовлю дизайн-референсы");
+        const styleReferenceSource = generation.userStyleAsset?.imageUrl ?? generation.userStyleAsset?.sourceImageUrl;
+        const references = await prepareGenerationReferences({
+          generationId: generation.id,
+          primaryUrl: generation.referenceImageUrl ?? undefined,
+          guestUrl: generation.guestReferenceImageUrl ?? undefined,
+          styleUrl: styleReferenceSource ?? undefined,
+          storage,
+          signal
+        });
+        throwIfAborted(signal, "Generation job");
         const templateReferenceUrl = await prepareTemplateReferenceUrl({
           generationId: generation.id,
           templateSlug: generation.template?.slug,
@@ -104,13 +114,13 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         });
         throwIfAborted(signal, "Generation job");
         const designText = deriveDesignTextConstraints(generation.template ?? generation.userStyleAsset ?? undefined);
-        await notifier.updateGenerationProgress(progress, "анализирую типографику и собираю prompt");
+        await notifier.updateGenerationProgress(progress, "prompt");
         const plan = await promptPlanner.plan({
           wizard: {
             format: generation.format,
             referenceMode: generation.referenceMode,
-            referenceImageUrl: generation.referenceImageUrl ?? undefined,
-            guestReferenceImageUrl: generation.guestReferenceImageUrl ?? undefined,
+            referenceImageUrl: references.primary,
+            guestReferenceImageUrl: references.guest,
             topic: generation.topic,
             niche: generation.niche,
             hookText: generation.hookText ?? undefined,
@@ -130,7 +140,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
             ? {
                 title: generation.userStyleAsset.title,
                 promptRules: generation.userStyleAsset.promptRules,
-                imageUrl: generation.userStyleAsset.imageUrl ?? generation.userStyleAsset.sourceImageUrl
+                imageUrl: references.style
               }
             : undefined,
           designText
@@ -147,21 +157,14 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           }
         });
 
-        const referenceUrls = await prepareReferenceImageUrls({
-          generationId: generation.id,
-          urls: [generation.referenceImageUrl, generation.guestReferenceImageUrl].filter((url): url is string => Boolean(url)),
-          storage,
-          signal
-        });
-        throwIfAborted(signal, "Generation job");
-        const styleReferenceUrl = generation.userStyleAsset?.imageUrl ?? generation.userStyleAsset?.sourceImageUrl;
         const imageReferenceUrls = [
-          ...referenceUrls,
+          ...(references.primary ? [references.primary] : []),
+          ...(references.guest ? [references.guest] : []),
           ...(templateReferenceUrl ? [templateReferenceUrl] : []),
-          ...(styleReferenceUrl ? [styleReferenceUrl] : [])
+          ...(references.style ? [references.style] : [])
         ];
 
-        await notifier.updateGenerationProgress(progress, "генерирую финальную обложку");
+        await notifier.updateGenerationProgress(progress, "generation");
         const result = await imageClient.generate({
           prompt: plan.prompt,
           imageUrl: imageReferenceUrls[0],
@@ -170,7 +173,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           signal
         });
         throwIfAborted(signal, "Generation job");
-        await notifier.updateGenerationProgress(progress, "сохраняю PNG и превью");
+        await notifier.updateGenerationProgress(progress, "processing");
         const finalImage = await normalizeFinal(result.bytes, spec.width, spec.height);
         throwIfAborted(signal, "Generation job");
         const preview = await createPreview(finalImage, Math.round(spec.width / 2), Math.round(spec.height / 2));
@@ -213,6 +216,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         if (generation.projectId) {
           await markProjectStatus(prisma, generation.projectId, projectStatusAfterGeneration("SUCCEEDED"));
         }
+        await notifier.updateGenerationProgress(progress, "delivery");
         await notifier.sendGenerationResult(job.data.userTelegramId, {
           generationId: generation.id,
           plan: chargedGeneration.chargedPlan,
@@ -221,6 +225,8 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           previewBytes: preview,
           originalBytes: finalImage
         });
+        await notifier.updateGenerationProgress(progress, "ready");
+        generationProgressCompleted = true;
       });
     } catch (error) {
       console.error("Generation job failed", {
@@ -256,7 +262,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
       }
       throw error;
     } finally {
-      await notifier.finishGenerationProgress(progress);
+      await notifier.finishGenerationProgress(progress, generationProgressCompleted);
     }
   },
   buildWorkerOptions({
