@@ -36,7 +36,6 @@ import {
   handleProjectVideoDocument,
   handleProjectVideoSource,
 } from "./projectFlow/sourceFlow.js";
-import { sendTemplateRecommendations } from "./projectFlow/templateRecommendations.js";
 import { enqueueProjectHooks, findOwnedProject } from "./projectFlow/hookFlow.js";
 import { trackProductEvent } from "./projectFlow/analytics.js";
 import { enqueueGenerationFromReference } from "./projectFlow/referenceGenerationFlow.js";
@@ -115,6 +114,20 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
     await sendTemplateGallery(ctx, templates, { mode: "select", platform });
   });
 
+  bot.callbackQuery(/^project:change-template:(.+)$/, async (ctx) => {
+    const project = await findOwnedProject(ctx, ctx.match[1]);
+    if (!project?.platform) {
+      await ctx.answerCallbackQuery("Сначала выберите формат.");
+      return;
+    }
+    const templates = await listTemplates(prisma, project.platform);
+    ctx.session.projectId = project.id;
+    ctx.session.templateGalleryMode = "select";
+    await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+    await sendTemplateGallery(ctx, templates, { mode: "select", platform: project.platform });
+  });
+
   bot.callbackQuery("templates:noop", async (ctx) => {
     await ctx.answerCallbackQuery();
   });
@@ -168,10 +181,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
     ctx.session.templateGalleryMode = "select";
-    await sendTemplateRecommendations(ctx, templates, platform, {
-      topicText: project?.topicSummary ?? project?.transcripts[0]?.cleanText ?? project?.transcripts[0]?.rawText,
-      guestFaceAvailable: Boolean(project?.guestFaceAsset)
-    });
+    await sendTemplateGallery(ctx, templates, { mode: "select", platform });
   });
 
   bot.callbackQuery("style-source:custom", async (ctx) => {
@@ -254,6 +264,18 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
     await askReferenceForGeneration(ctx);
   });
 
+  bot.callbackQuery(/^referenceface:choose:(.+)$/, async (ctx) => {
+    const project = await findOwnedProject(ctx, ctx.match[1]);
+    if (!project) {
+      await ctx.answerCallbackQuery("Проект недоступен.");
+      return;
+    }
+    ctx.session.projectId = project.id;
+    await ctx.answerCallbackQuery();
+    await deleteCallbackMessage(ctx);
+    await askReferenceForGeneration(ctx);
+  });
+
   bot.callbackQuery(/^referenceface:use:(.+)$/, async (ctx) => {
     const imageUrl = await useSavedReferenceFace(ctx, ctx.match[1], token);
     if (!imageUrl) return;
@@ -271,7 +293,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
     ctx.session.faceGalleryMode = "reference";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(referenceForGenerationPrompt(), { reply_markup: backHomeKeyboard("project:back:hooks") });
+    await ctx.reply(referenceForGenerationPrompt(), { reply_markup: backHomeKeyboard("project:back:templates") });
   });
 
   bot.on("message:video", async (ctx) => {

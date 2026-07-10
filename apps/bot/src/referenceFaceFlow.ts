@@ -28,7 +28,7 @@ export async function askReferenceForGeneration(ctx: BotContext) {
   ctx.session.step = "referenceUpload";
   ctx.session.faceGalleryMode = "reference";
   if (faces.length === 0) {
-    await ctx.reply(referenceForGenerationPrompt(), { reply_markup: backHomeKeyboard("project:back:hooks") });
+    await ctx.reply(referenceForGenerationPrompt(), { reply_markup: backHomeKeyboard("project:back:templates") });
     return;
   }
   await sendFaceGallery(ctx, faces, { mode: "reference" });

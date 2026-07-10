@@ -9,6 +9,7 @@ import {
   prisma,
   recordProductEvent,
   replaceProjectHooks,
+  selectBestProjectHook,
   updateGenerationPrompt,
   upsertProjectTranscript
 } from "@covers/db";
@@ -300,7 +301,7 @@ const hookWorker = new Worker<HookJobData, void, string>(
         throwIfAborted(signal, "Hook job");
         const textForHooks = transcript ?? "Пользователь загрузил видео без транскрипта.";
         const designText = deriveDesignTextConstraints(project.selectedTemplate ?? project.selectedUserStyleAsset ?? undefined);
-        await notifier.updateHookProgress(progress, "Подбираю короткие варианты под выбранный шаблон");
+        await notifier.updateHookProgress(progress, "Подбираю лучший CTR-текст под выбранный шаблон");
         const hooks = await promptPlanner.generateHooks({
           transcript: textForHooks,
           platform: project.platform ?? "YOUTUBE",
@@ -311,6 +312,7 @@ const hookWorker = new Worker<HookJobData, void, string>(
         }, { signal });
         throwIfAborted(signal, "Hook job");
         const savedHooks = await replaceProjectHooks(prisma, project.id, hooks);
+        const selectedProject = await selectBestProjectHook(prisma, project.id);
         await markProjectStatus(prisma, project.id, "HOOKS_READY");
         await trackProductEvent({
           name: "hooks_ready",
@@ -318,7 +320,13 @@ const hookWorker = new Worker<HookJobData, void, string>(
           projectId: project.id,
           metadata: { candidateCount: savedHooks.length }
         });
-        await notifier.sendHookCandidates(job.data.userTelegramId, project.id, savedHooks);
+        await trackProductEvent({
+          name: "hook_selected",
+          userId: project.userId,
+          projectId: project.id,
+          metadata: { mode: "auto_worker", hookId: selectedProject.selectedHook?.id }
+        });
+        await notifier.sendAutoHookReady(job.data.userTelegramId, project.id, selectedProject.selectedHook?.text);
       });
     } catch (error) {
       if (isFinalAttempt(job)) {

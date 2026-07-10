@@ -9,11 +9,11 @@ export function buildFallbackHooks(context: HookContext, maxWords = DEFAULT_MAX_
   const secondary = keywords.find((keyword) => keyword !== primary) ?? "разбор";
   const number = context.numbers[0];
   const hooks = [
-    number ? `${number} ${primary}` : `${primary}: главное`,
-    `почему ${primary}`,
-    `${primary} без ошибок`,
-    `${primary}: разбор`,
-    `${primary} и ${secondary}`
+    number ? `${number} ошибка в ${primary}` : `ошибка в ${primary}`,
+    `почему ${primary} не работает`,
+    `${primary}: скрытая причина`,
+    `${primary} без потерь`,
+    `${primary} против ${secondary}`
   ];
 
   return hooks.map((text, index) => ({

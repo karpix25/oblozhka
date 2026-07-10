@@ -74,14 +74,17 @@ export class TelegramNotifier {
     });
   }
 
-  async sendHookCandidates(chatId: number, projectId: string, hooks: Array<{ id: string; text: string }>) {
-    await this.bot.api.sendMessage(chatId, "Текст готов. Первый вариант лучше всего подходит выбранному шаблону — можно взять его или выбрать другой.", {
+  async sendAutoHookReady(chatId: number, projectId: string, hookText?: string | null) {
+    await this.bot.api.sendMessage(chatId, [
+      "Текст для обложки выбран автоматически.",
+      hookText ? `Хук: ${hookText}` : "Я взял самый сильный CTR-вариант под выбранный шаблон.",
+      "",
+      "Теперь выберите сохранённое лицо или загрузите новое фото — после этого сразу начну генерацию."
+    ].join("\n"), {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "✓ Использовать рекомендованный", callback_data: `hook:auto:${projectId}` }],
-          ...hooks.map((hook, index) => [
-            { text: `${index + 1}. ${hook.text}`, callback_data: `hook:${projectId}:${hook.id}` }
-          ])
+          [{ text: "🚀 Перейти к фото · 1 генерация", callback_data: `referenceface:choose:${projectId}` }],
+          [{ text: "⬅️ Выбрать другой шаблон", callback_data: `project:change-template:${projectId}` }]
         ]
       }
     });
@@ -128,10 +131,10 @@ function generationProgressText(stage: string) {
 
 function projectProgressText(stage: string) {
   return [
-    "⏳ Готовлю текст для обложки",
+    "⏳ Подбираю текст для обложки",
     "",
     `Сейчас: ${stage}.`,
-    "Можно закрыть Telegram — я пришлю варианты сюда."
+    "Можно закрыть Telegram — я пришлю следующий шаг сюда."
   ].join("\n");
 }
 

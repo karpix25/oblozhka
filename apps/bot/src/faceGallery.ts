@@ -18,7 +18,7 @@ export async function sendFaceGallery(
   input: { mode: FaceGalleryMode; page?: number; replace?: boolean }
 ) {
   if (faces.length === 0) {
-    const backCallback = input.mode === "reference" ? "project:back:hooks" : "home";
+    const backCallback = input.mode === "reference" ? "project:back:templates" : "home";
     await ctx.reply(emptyCaption(input.mode), { reply_markup: backHomeKeyboard(backCallback) });
     return;
   }
@@ -73,7 +73,7 @@ function faceGalleryKeyboard(input: { mode: FaceGalleryMode; page: number; total
     keyboard.text("📤 Загрузить новое фото · 1 генерация", uploadCallback(input.mode)).row();
   }
 
-  if (input.mode === "reference") keyboard.text("⬅️ Назад", "project:back:hooks");
+  if (input.mode === "reference") keyboard.text("⬅️ Назад", "project:back:templates");
   keyboard.text("🏠 В начало", "home");
   return keyboard;
 }

@@ -23,7 +23,7 @@ export async function handleProjectPhoto(ctx: BotContext, token: string, abuseGu
       { projectId: ctx.session.projectId!, userTelegramId: ctx.from!.id },
       { jobId: hookJobId(ctx.session.projectId!) }
     );
-    await ctx.reply("Сохранил второе лицо. Анализирую ролик и готовлю варианты текста для обложки.");
+    await ctx.reply("Сохранил второе лицо. Анализирую ролик и сам выберу самый сильный текст для обложки.");
     return true;
   }
   if (guestFaceResult === "handled") return true;
@@ -34,7 +34,7 @@ export async function handleProjectPhoto(ctx: BotContext, token: string, abuseGu
   const file = await ctx.api.getFile(photo.file_id);
   if (!file.file_path) {
     await ctx.reply("Не получилось прочитать фото. Попробуйте отправить изображение ещё раз.", {
-      reply_markup: backHomeKeyboard("project:back:hooks")
+      reply_markup: backHomeKeyboard("project:back:templates")
     });
     return true;
   }

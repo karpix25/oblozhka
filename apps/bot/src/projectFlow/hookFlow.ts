@@ -1,5 +1,4 @@
-import { findProject, getBillingAccess, listTemplates, prisma, upsertTelegramUser } from "@covers/db";
-import { InlineKeyboard } from "grammy";
+import { findProject, getBillingAccess, listTemplates, prisma, selectBestProjectHook, upsertTelegramUser } from "@covers/db";
 import type { BotAbuseGuard } from "../abuseGuard.js";
 import { styleSourceKeyboard } from "../keyboards.js";
 import { platformPrompt, sourcePrompt } from "../messages.js";
@@ -9,7 +8,7 @@ import { askReferenceForGeneration } from "../referenceFaceFlow.js";
 import { hookJobId, hookQueue } from "../queue.js";
 import { backHomeKeyboard, projectsKeyboard } from "../sectionKeyboards.js";
 import type { BotContext } from "../session.js";
-import { sendTemplateRecommendations } from "./templateRecommendations.js";
+import { sendTemplateGallery } from "../templateGallery.js";
 import { profileFromContext } from "../userProfile.js";
 import { platformKeyboard, sourceTypeKeyboard } from "../keyboards.js";
 import { trackProductEvent } from "./analytics.js";
@@ -34,7 +33,7 @@ export async function enqueueProjectHooks(ctx: BotContext, abuseGuard: BotAbuseG
     { jobId: hookJobId(projectId) }
   );
   trackProductEvent("hooks_started", { projectId, metadata: { retry } });
-  await ctx.reply(retry ? "Пробую подготовить текст ещё раз." : "Анализирую ролик и готовлю варианты текста для обложки.");
+  await ctx.reply(retry ? "Пробую подготовить текст ещё раз." : "Анализирую ролик и сам выберу самый сильный текст для обложки.");
   return true;
 }
 
@@ -65,7 +64,9 @@ export async function resumeProject(ctx: BotContext, projectId: string, abuseGua
     return;
   }
   if (!project.selectedHook) {
-    await sendHookChoices(ctx, project.id, project.hooks);
+    await selectBestProjectHook(prisma, project.id);
+    trackProductEvent("hook_selected", { projectId: project.id, metadata: { mode: "auto_resume" } });
+    await askReferenceForGeneration(ctx);
     return;
   }
   if (project.status === "GENERATION_PENDING") {
@@ -88,12 +89,16 @@ export async function showProjectHooks(ctx: BotContext) {
   const project = await findOwnedProject(ctx, ctx.session.projectId);
   if (!project) return;
   if (project.hooks.length === 0) {
-    await ctx.reply("Варианты текста ещё готовятся. Я пришлю их отдельным сообщением.", {
+    await ctx.reply("Текст для обложки ещё готовится. Я сам выберу самый сильный вариант и пришлю следующий шаг.", {
       reply_markup: projectsKeyboard()
     });
     return;
   }
-  await sendHookChoices(ctx, project.id, project.hooks);
+  if (!project.selectedHook) {
+    await selectBestProjectHook(prisma, project.id);
+    trackProductEvent("hook_selected", { projectId: project.id, metadata: { mode: "auto_back" } });
+  }
+  await askReferenceForGeneration(ctx);
 }
 
 export async function showProjectTemplates(ctx: BotContext) {
@@ -101,10 +106,7 @@ export async function showProjectTemplates(ctx: BotContext) {
   const project = await findOwnedProject(ctx, ctx.session.projectId);
   if (!project?.platform) return;
   const templates = await listTemplates(prisma, project.platform);
-  await sendTemplateRecommendations(ctx, templates, project.platform, {
-    topicText: project.topicSummary ?? project.transcripts[0]?.cleanText ?? project.transcripts[0]?.rawText,
-    guestFaceAvailable: Boolean(project.guestFaceAsset)
-  });
+  await sendTemplateGallery(ctx, templates, { mode: "select", platform: project.platform });
 }
 
 export async function showProjectSourcePrompt(ctx: BotContext) {
@@ -124,19 +126,4 @@ export async function findOwnedProject(ctx: BotContext, projectId: string) {
     return null;
   }
   return project;
-}
-
-async function sendHookChoices(
-  ctx: BotContext,
-  projectId: string,
-  hooks: Array<{ id: string; text: string }>
-) {
-  const keyboard = new InlineKeyboard().text("⭐ Использовать лучший вариант", `hook:auto:${projectId}`).row();
-  hooks.slice(0, 4).forEach((hook, index) => {
-    keyboard.text(`${index + 1}. ${hook.text}`, `hook:${projectId}:${hook.id}`).row();
-  });
-  keyboard.text("⬅️ Назад", "project:back:templates").text("🏠 В начало", "home");
-  await ctx.reply("Рекомендую первый вариант. Можно использовать его сразу или выбрать другой:", {
-    reply_markup: keyboard
-  });
 }
