@@ -29,6 +29,9 @@ export function tariffsMessage() {
 }
 
 export function balanceMessage(access: BillingAccess) {
+  if (access.kind === "superadmin") {
+    return ["Доступ: Суперадмин", "Кредиты: безлимит"].join("\n");
+  }
   if (access.kind === "trial") {
     return [
       `Пробный доступ: осталось ${access.remainingCredits} из ${TRIAL_CREDITS} кредитов.`,

@@ -12,6 +12,7 @@ export * from "./productEvents.js";
 export * from "./presets.js";
 export * from "./projects.js";
 export * from "./subscriptions.js";
+export * from "./superadmin.js";
 export * from "./templates.js";
 export * from "./transcripts.js";
 export * from "./userStyleAssets.js";

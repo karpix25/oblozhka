@@ -75,6 +75,9 @@ export async function debitGenerationCreditInTransaction(
   assertPositiveCredits(input.amount);
 
   const access = await getBillingAccess(db, input.userId);
+  if (access.kind === "superadmin") {
+    return { access, ledgerEntry: null };
+  }
   if (access.kind === "subscription") {
     const ledgerEntry = await debitSubscriptionCredits(db, input, access);
 

@@ -2,7 +2,7 @@ import type { BillingAccess } from "@covers/db";
 import { canUseEntitlement, type EntitlementSubject } from "@covers/domain";
 
 export function entitlementSubjectForAccess(access: BillingAccess): EntitlementSubject {
-  return access.kind === "subscription" ? { kind: "subscription", plan: access.plan } : { kind: "trial" };
+  return access.kind === "trial" ? { kind: "trial" } : { kind: "subscription", plan: access.plan };
 }
 
 export function canUseCustomStyle(access: BillingAccess) {

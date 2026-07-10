@@ -18,6 +18,6 @@ export async function openCoverHistory(
   await sendCoverGallery(ctx, covers, {
     page: input.page,
     replace: input.replace,
-    plan: access.kind === "subscription" ? access.plan : null
+    plan: access.kind === "trial" ? null : access.plan
   });
 }

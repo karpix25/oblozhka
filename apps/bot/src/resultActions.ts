@@ -9,6 +9,7 @@ import { InlineKeyboard, type Bot } from "grammy";
 import type { BotAbuseGuard } from "./abuseGuard.js";
 import { insufficientCreditsMessage } from "./billingMessages.js";
 import { enqueueGenerationOrCompensate } from "./generationQueueing.js";
+import { entitlementSubjectForAccess } from "./planUi.js";
 import { balanceKeyboard, insufficientCreditsKeyboard } from "./sectionKeyboards.js";
 import type { BotContext } from "./session.js";
 import { startStyleUpload } from "./styleLibrary.js";
@@ -37,7 +38,7 @@ export function registerResultActionHandlers(bot: Bot<BotContext>, abuseGuard: B
     }
     const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
     const access = await getBillingAccess(prisma, user.id);
-    const subject = access.kind === "subscription" ? { kind: "subscription" as const, plan: access.plan } : { kind: "trial" as const };
+    const subject = entitlementSubjectForAccess(access);
     if (!canUseEntitlement(subject, action.requiredFeature)) {
       await ctx.answerCallbackQuery();
       await ctx.reply(modernizationActionLockedMessage(action), {
@@ -97,7 +98,7 @@ export async function handleResultActionText(ctx: BotContext, abuseGuard: BotAbu
 
   const user = await upsertTelegramUser(prisma, profileFromContext(ctx));
   const access = await getBillingAccess(prisma, user.id);
-  const subject = access.kind === "subscription" ? { kind: "subscription" as const, plan: access.plan } : { kind: "trial" as const };
+  const subject = entitlementSubjectForAccess(access);
   if (!canUseEntitlement(subject, action.requiredFeature)) {
     ctx.session.step = "idle";
     ctx.session.modernization = undefined;

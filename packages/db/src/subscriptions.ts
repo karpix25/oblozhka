@@ -1,10 +1,20 @@
 import { BILLING_PERIOD_DAYS, getPlanConfig, type PaidPlan } from "@covers/domain";
 import type { Prisma } from "@prisma/client";
 import type { DbClient } from "./client.js";
+import { isSuperadminTelegramId } from "./superadmin.js";
 
 type SubscriptionDb = DbClient | Prisma.TransactionClient;
 
 export type BillingAccess =
+  | {
+      kind: "superadmin";
+      plan: "BUSINESS";
+      remainingCredits: null;
+      monthlyCreditLimit: null;
+      avatarLimit: null;
+      queuePriority: number;
+      currentPeriodEnd: null;
+    }
   | {
       kind: "subscription";
       subscriptionId: string;
@@ -25,6 +35,20 @@ export type BillingAccess =
     };
 
 export async function getBillingAccess(db: SubscriptionDb, userId: string, now = new Date()): Promise<BillingAccess> {
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  if (isSuperadminTelegramId(user.telegramId)) {
+    const config = getPlanConfig("BUSINESS");
+    return {
+      kind: "superadmin",
+      plan: "BUSINESS",
+      remainingCredits: null,
+      monthlyCreditLimit: null,
+      avatarLimit: null,
+      queuePriority: config.queuePriority,
+      currentPeriodEnd: null
+    };
+  }
+
   await expireOldSubscriptions(db, userId, now);
   const subscription = await activeSubscription(db, userId, now);
   if (subscription) {
@@ -45,7 +69,6 @@ export async function getBillingAccess(db: SubscriptionDb, userId: string, now =
     };
   }
 
-  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   return {
     kind: "trial",
     remainingCredits: user.balance,
