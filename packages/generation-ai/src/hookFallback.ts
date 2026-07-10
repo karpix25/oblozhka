@@ -17,16 +17,16 @@ export function buildFallbackHooks(
   const secondary = keywords.find((keyword) => keyword !== primary) ?? "разбор";
   const number = context.numbers[0];
   const hooks = [
-    number ? `${number} ошибка в ${primary}` : `ошибка в ${primary}`,
-    `почему ${primary} не работает`,
-    `${primary}: скрытая причина`,
-    `${primary} без потерь`,
-    `${primary} против ${secondary}`
+    { text: number ? `${number} ошибка в ${primary}` : `ошибка в ${primary}`, angle: "mistake_cost" },
+    { text: `${primary}: скрытая причина`, angle: "hidden_reason" },
+    { text: `${primary} работает наоборот`, angle: "counterintuitive" },
+    { text: number ? `${number} в ${primary}` : `${primary} без потерь`, angle: number ? "object_proof" : "stakes" },
+    { text: `${primary} против ${secondary}`, angle: "visual_pair" }
   ];
 
-  return hooks.map((text, index) => ({
-    text: fitHookText(text, maxWords).toLocaleUpperCase("ru"),
-    angle: ["specific", "reason", "mistake", "analysis", "contrast"][index],
+  return hooks.map((hook, index) => ({
+    text: fitHookText(hook.text, maxWords).toLocaleUpperCase("ru"),
+    angle: hook.angle,
     score: 70 - index * 5
   }));
 }

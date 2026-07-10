@@ -4,7 +4,7 @@ import { OpenRouterPromptPlanner } from "../packages/generation-ai/src/openroute
 import { buildThumbnailHookPrompt } from "../packages/generation-ai/src/thumbnailHookPrompt.js";
 import { countHookWords } from "../packages/generation-ai/src/hookText.js";
 
-test("thumbnail hook prompt requests fifteen evidence-backed Russian candidates", () => {
+test("thumbnail hook prompt requests framework-based evidence-backed Russian candidates", () => {
   const prompt = buildThumbnailHookPrompt({
     transcript: "Реклама принесла 30 лидов, но продажи остановились из-за ошибки в воронке.",
     contentLanguage: "ru",
@@ -17,8 +17,8 @@ test("thumbnail hook prompt requests fifteen evidence-backed Russian candidates"
     }
   });
 
-  assert.match(prompt, /Верни ровно 15 разных кандидатов/);
-  assert.match(prompt, /каждого angle ровно 3/);
+  assert.match(prompt, /Верни ровно 14 разных кандидатов/);
+  assert.match(prompt, /каждого angle ровно 2/);
   assert.match(prompt, /от 2 до 4 слов/);
   assert.match(prompt, /только русские слова кириллицей/);
   assert.match(prompt, /не повторяй и не пересказывай sourceTitle или theme/i);
@@ -33,14 +33,15 @@ test("successful hook generation filters weak variants and ranks locally", async
           message: {
             content: JSON.stringify({
               hooks: [
-                { text: "Как поднять продажи", angle: "result", evidence: "Повторяет заголовок" },
-                { text: "AI меняет продажи", angle: "result", evidence: "Смешанный язык" },
-                { text: "Смотри до конца", angle: "curiosity", evidence: "Пустая формула" },
-                { text: "30 лидов без скидок", angle: "specificity", evidence: "Реклама принесла 30 лидов" },
-                { text: "Ошибка съедает продажи", angle: "stakes", evidence: "Продажи остановились из-за ошибки" },
-                { text: "Реклама работает наоборот", angle: "contrarian", evidence: "Ошибка возникла в воронке" },
-                { text: "Что скрыла воронка", angle: "curiosity", evidence: "Проблема скрывалась в воронке" },
-                { text: "Продажи остановила воронка", angle: "result", evidence: "Продажи остановились из-за ошибки в воронке" }
+                { text: "Как поднять продажи", angle: "specific_result", evidence: "Реклама принесла 30 лидов" },
+                { text: "AI меняет продажи", angle: "specific_result", evidence: "Смешанный язык" },
+                { text: "Смотри до конца", angle: "hidden_reason", evidence: "Пустая формула" },
+                { text: "30 лидов без скидок", angle: "object_proof", evidence: "Реклама принесла 30 лидов" },
+                { text: "Ошибка съедает продажи", angle: "mistake_cost", evidence: "Продажи остановились из-за ошибки" },
+                { text: "Реклама работает наоборот", angle: "counterintuitive", evidence: "Ошибка возникла в воронке" },
+                { text: "Что скрыла воронка", angle: "hidden_reason", evidence: "Проблема скрывалась в воронке" },
+                { text: "Продажи остановила воронка", angle: "stakes", evidence: "Продажи остановились из-за ошибки в воронке" },
+                { text: "Воронка до и после", angle: "visual_pair", evidence: "Ошибка возникла в воронке, продажи остановились" }
               ]
             })
           }
@@ -63,6 +64,7 @@ test("successful hook generation filters weak variants and ranks locally", async
     assert.equal(hooks.length, 5);
     assert.ok(hooks.every((hook) => countHookWords(hook.text) >= 2 && countHookWords(hook.text) <= 5));
     assert.ok(hooks.every((hook) => !/[A-Za-z]/.test(hook.text)));
+    assert.ok(hooks.every((hook) => hook.evidence));
     assert.ok(hooks.every((hook) => typeof hook.score === "number" && hook.score >= 0 && hook.score <= 100));
     assert.ok(!hooks.some((hook) => hook.text === "Как поднять продажи"));
     assert.ok(!hooks.some((hook) => hook.text === "Смотри до конца"));

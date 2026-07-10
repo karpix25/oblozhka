@@ -187,12 +187,13 @@ export class OpenRouterPromptPlanner {
       const parsed = JSON.parse(content) as { hooks?: Array<{ text?: string; angle?: string; evidence?: string }> };
       const rawHooks = parsed.hooks
         ?.filter((hook) => hook.text)
-        .map((hook) => ({ text: hook.text!, angle: hook.angle }));
+        .map((hook) => ({ text: hook.text!, angle: hook.angle, evidence: hook.evidence }));
       const hooks = rankThumbnailHooks(rawHooks ?? [], {
         context: hookContext,
         contentLanguage,
         sourceTitle,
         maxWords,
+        requireEvidence: true,
         limit: 5
       });
       return hooks.length ? hooks : this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);

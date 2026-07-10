@@ -1,10 +1,12 @@
 import type { ContentLanguage } from "./contentLanguage.js";
+import { scoreHookFramework } from "./hookFrameworkScoring.js";
 import { countHookWords, hookFingerprint, normalizeHookText } from "./hookText.js";
 import type { HookCandidate, HookContext } from "./hookTypes.js";
 
 const DEFAULT_MIN_WORDS = 2;
 const DEFAULT_MAX_WORDS = 5;
 const DEFAULT_MAX_CHARACTERS = 36;
+const NUMBER_PATTERN = /\b\d+(?:[.,]\d+)?%?\b/gu;
 const TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
 const LATIN_PATTERN = /[A-Za-z]/;
 const PUNCTUATION_PATTERN = /[!?.,:;()[\]{}"'`«»“”‘’—–-]/g;
@@ -46,6 +48,8 @@ export type ThumbnailHookBreakdown = {
   specificity: number;
   readability: number;
   titleSynergy: number;
+  frameworkFit: number;
+  evidenceSupport: number;
 };
 
 export type ThumbnailHookQualityOptions = {
@@ -55,6 +59,7 @@ export type ThumbnailHookQualityOptions = {
   minWords?: number;
   maxWords?: number;
   maxCharacters?: number;
+  requireEvidence?: boolean;
 };
 
 export type ThumbnailHookEvaluation = {
@@ -76,13 +81,20 @@ export function evaluateThumbnailHook(
   const wordCount = countHookWords(text);
   const minWords = options.minWords ?? DEFAULT_MIN_WORDS;
   const maxWords = options.maxWords ?? DEFAULT_MAX_WORDS;
+  const evidence = normalizeHookText(candidate.evidence ?? "");
+  const frameworkMatch = scoreHookFramework(text, candidate.angle);
+  const evidenceSupport = scoreEvidenceSupport(evidence, text, options);
   const reasons: string[] = [];
 
   if (!text || !fingerprint) reasons.push("empty");
   if (wordCount < minWords) reasons.push("too_few_words");
   if (wordCount > maxWords) reasons.push("too_many_words");
+  if (candidate.angle && !frameworkMatch.framework) reasons.push("unknown_framework");
   if (options.contentLanguage === "ru" && LATIN_PATTERN.test(text)) reasons.push("latin_in_russian_hook");
   if (isGenericClickbait(fingerprint)) reasons.push("generic_clickbait");
+  if (hasUnsupportedNumber(text, evidence, options.context)) reasons.push("unsupported_number");
+  if (options.requireEvidence && !evidence) reasons.push("missing_evidence");
+  if (options.requireEvidence && evidence && evidenceSupport === 0) reasons.push("unsupported_evidence");
   if (wordCount === 1 && isMeaninglessSingleWord(fingerprint, options.context)) {
     reasons.push("meaningless_single_word");
   }
@@ -90,9 +102,15 @@ export function evaluateThumbnailHook(
     reasons.push("near_source_repeat");
   }
 
-  const breakdown = scoreBreakdown(text, options);
+  const breakdown = scoreBreakdown(text, options, frameworkMatch.score, evidenceSupport);
   const score = clampScore(Object.values(breakdown).reduce((sum, value) => sum + value, 0));
-  const hook = { ...candidate, text, score };
+  const hook = {
+    ...candidate,
+    text,
+    angle: frameworkMatch.framework ?? candidate.angle,
+    evidence: evidence || undefined,
+    score
+  };
 
   return {
     accepted: reasons.length === 0,
@@ -134,7 +152,9 @@ type RankedHook = {
 
 function scoreBreakdown(
   text: string,
-  options: ThumbnailHookQualityOptions
+  options: ThumbnailHookQualityOptions,
+  frameworkFit: number,
+  evidenceSupport: number
 ): ThumbnailHookBreakdown {
   const hookTokens = significantTokens(text);
   const contextTokens = new Set([
@@ -148,6 +168,7 @@ function scoreBreakdown(
   const contextMatches = countMatches(hookTokens, contextTokens);
   const numberMatches = options.context.numbers.filter((number) => text.includes(number)).length;
   const hasNumber = /\d/.test(text);
+  const hasSpecificSupport = keywordMatches > 0 || contextMatches > 0 || numberMatches > 0;
 
   const relevance = clamp(
     contextMatches * 4 + keywordMatches * 3 + numberMatches * 5,
@@ -155,9 +176,11 @@ function scoreBreakdown(
     25
   );
   const curiosityTension = clamp(
-    (TENSION_PATTERN.test(text) ? 10 : 0) +
-      (CURIOSITY_PATTERN.test(text) ? 7 : 0) +
-      (/[?:]/.test(text) ? 3 : 0),
+    hasSpecificSupport
+      ? (TENSION_PATTERN.test(text) ? 10 : 0) +
+        (CURIOSITY_PATTERN.test(text) ? 7 : 0) +
+        (/[?:]/.test(text) ? 3 : 0)
+      : 0,
     0,
     20
   );
@@ -171,7 +194,44 @@ function scoreBreakdown(
   const readability = scoreReadability(text, options);
   const titleSynergy = scoreTitleSynergy(hookTokens, sourceTokens, relevance);
 
-  return { relevance, curiosityTension, specificity, readability, titleSynergy };
+  return {
+    relevance,
+    curiosityTension,
+    specificity,
+    readability,
+    titleSynergy,
+    frameworkFit: clamp(frameworkFit, 0, 25),
+    evidenceSupport: clamp(evidenceSupport, 0, 15)
+  };
+}
+
+function scoreEvidenceSupport(
+  evidence: string,
+  text: string,
+  options: ThumbnailHookQualityOptions
+): number {
+  if (!evidence) return 0;
+  const evidenceFingerprint = hookFingerprint(evidence);
+  const transcriptFingerprint = hookFingerprint(options.context.transcript);
+  const evidenceTokens = significantTokens(evidence);
+  const hookTokens = significantTokens(text);
+  const contextTokens = new Set([
+    ...options.context.keywords.flatMap(significantTokens),
+    ...significantTokens(options.context.transcript)
+  ]);
+  const contextMatches = countMatches(evidenceTokens, contextTokens);
+  const hookMatches = countMatches(hookTokens, new Set(evidenceTokens));
+  const evidenceNumbers = extractNumbers(evidence);
+  const numberMatches = evidenceNumbers.filter((number) => numberSupported(number, options.context.numbers)).length;
+
+  return clamp(
+    (evidenceFingerprint && transcriptFingerprint.includes(evidenceFingerprint) ? 6 : 0) +
+      Math.min(5, contextMatches * 2) +
+      Math.min(2, hookMatches) +
+      Math.min(2, numberMatches * 2),
+    0,
+    15
+  );
 }
 
 function scoreReadability(text: string, options: ThumbnailHookQualityOptions): number {
@@ -216,6 +276,24 @@ function isNearSourceRepeat(text: string, sources: Array<string | undefined>): b
     const overlap = countMatches(hookTokens, sourceTokens);
     return overlap / hookTokens.length >= 0.8 && overlap / sourceTokens.size >= 0.65;
   });
+}
+
+function hasUnsupportedNumber(text: string, evidence: string, context: HookContext): boolean {
+  const referenceNumbers = [...context.numbers, ...extractNumbers(evidence)];
+  return extractNumbers(text).some((number) => !numberSupported(number, referenceNumbers));
+}
+
+function extractNumbers(text: string): string[] {
+  return text.match(NUMBER_PATTERN) ?? [];
+}
+
+function numberSupported(number: string, referenceNumbers: string[]): boolean {
+  const normalized = normalizeNumber(number);
+  return referenceNumbers.some((candidate) => normalizeNumber(candidate) === normalized);
+}
+
+function normalizeNumber(number: string): string {
+  return number.replace("%", "").replace(",", ".");
 }
 
 function significantTokens(text: string): string[] {

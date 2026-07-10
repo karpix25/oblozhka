@@ -1,6 +1,7 @@
 export type HookCandidate = {
   text: string;
   angle?: string;
+  evidence?: string;
   score?: number;
 };
 

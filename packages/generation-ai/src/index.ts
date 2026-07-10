@@ -1,4 +1,6 @@
 export * from "./contentLanguage.js";
+export * from "./hookFrameworkScoring.js";
+export * from "./hookFrameworks.js";
 export * from "./kie.js";
 export * from "./openrouter.js";
 export * from "./thumbnailHookPrompt.js";
