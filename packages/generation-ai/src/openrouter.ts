@@ -2,20 +2,19 @@ import { buildFallbackHooks } from "./hookFallback.js";
 import { buildHookContext } from "./hookContext.js";
 import { deriveMaxHookWords } from "./hookText.js";
 import type { HookCandidate, HookContext } from "./hookTypes.js";
-import { normalizeAndRankHooks } from "./hookValidation.js";
 import { repairImagePrompt, validateImagePrompt } from "./promptValidator.js";
 import { referenceRoleContract } from "./referenceContract.js";
 import {
-  isRussianOnlyText,
   resolveContentLanguage,
   type ContentLanguage
 } from "./contentLanguage.js";
 import {
   fallbackVisualLanguageRule,
-  hookLanguageGuide,
   promptContentLanguage,
   visualLanguageGuide
 } from "./languagePrompt.js";
+import { buildThumbnailHookPrompt } from "./thumbnailHookPrompt.js";
+import { rankThumbnailHooks } from "./thumbnailHookQuality.js";
 import type { PromptPlan, PromptPlanningInput } from "./types.js";
 
 type OpenRouterMessage = {
@@ -97,6 +96,7 @@ export class OpenRouterPromptPlanner {
     platform: string;
     contentLanguage?: ContentLanguage;
     theme?: string;
+    sourceTitle?: string;
     templateTitle?: string;
     templateRules?: string;
     designText?: {
@@ -109,9 +109,10 @@ export class OpenRouterPromptPlanner {
     const hookContext = buildHookContext({ transcript: input.transcript, theme: input.theme });
     const maxWords = input.designText?.maxWords ?? deriveMaxHookWords(input.templateRules);
     const contentLanguage = resolveContentLanguage(input.contentLanguage, input.transcript);
+    const sourceTitle = input.sourceTitle ?? input.theme;
 
     if (!this.apiKey) {
-      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);
     }
 
     let response: Awaited<ReturnType<typeof fetchOpenRouterText>>;
@@ -133,32 +134,27 @@ export class OpenRouterPromptPlanner {
             messages: [
               {
                 role: "system",
-                content: "Ты senior thumbnail editor для YouTube/Reels. Твоя задача — выбрать максимально кликабельный, честный CTR-хук для текста на обложке."
+                content: "Ты senior thumbnail editor. Создавай честные короткие тексты для обложек и строго соблюдай JSON-контракт пользователя."
               },
               {
                 role: "user",
-                content: [
-                  "Верни JSON: {\"hooks\":[{\"text\":\"...\",\"angle\":\"...\",\"score\":90}]}",
-                  hookLanguageGuide(contentLanguage),
-                  "Оценивай score как прогноз CTR: конкретика, любопытство, визуальная читаемость, связь с темой ролика, сила конфликта.",
-                  "До 5 слов, крупно читается в превью, усиливает конфликт/интригу и не требует объяснений.",
-                  "Каждый хук должен опираться на конкретику из ролика: объект, цифру, цену, ошибку, контраст, результат, потерю, выигрыш, скрытую причину или до/после.",
-                  "Лучшие механики: «ошибка → цена», «скрытая причина», «контраст ожидание/реальность», «цифра/сумма», «что изменилось», «почему не работает», «доказательство объектом».",
-                  "Не используй общие фразы без смысла: Я НЕ ОЖИДАЛ, ТАК НЕЛЬЗЯ, ВСЁ ИЗМЕНИЛОСЬ, ЭТО ВАЖНО, СМОТРИ ДО КОНЦА.",
-                  "Не используй вопрос ради вопроса. Вопрос допустим только если в нём есть конкретный объект, цифра или конфликт.",
-                  "Подбирай CTR-механику под шаблон: contrast, mistake, hidden reason, deadline/countdown, metric, transformation, object proof.",
-                  `Платформа: ${input.platform}.`,
-                  `Тема: ${input.theme ?? "не указана"}.`,
-                  `Шаблон: ${input.templateTitle ?? "не выбран"}.`,
-                  `Правила шаблона: ${input.templateRules ?? "нет"}.`,
-                  input.designText?.summary ? `Ограничения дизайна для текста: ${input.designText.summary}` : "",
-                  input.designText?.maxWords ? `Жёсткий лимит: максимум ${input.designText.maxWords} слов в хуке.` : "",
-                  input.designText?.textPlacement ? `Зона текста: ${input.designText.textPlacement}.` : "",
-                  input.designText?.typography ? `Типографика референса: ${input.designText.typography}.` : "",
-                  "Не предлагай хук, который не поместится в выбранный дизайн или сломает композицию.",
-                  "Текст ролика:",
-                  input.transcript.slice(0, 12000)
-                ].join("\n")
+                content: buildThumbnailHookPrompt({
+                  transcript: input.transcript,
+                  contentLanguage,
+                  platform: input.platform,
+                  theme: input.theme,
+                  sourceTitle,
+                  templateConstraints: {
+                    maxWords,
+                    summary: input.designText?.summary,
+                    promptRules: [
+                      input.templateTitle ? `Template: ${input.templateTitle}` : "",
+                      input.templateRules ?? ""
+                    ].filter(Boolean).join("\n"),
+                    textPlacement: input.designText?.textPlacement,
+                    typography: input.designText?.typography
+                  }
+                })
               }
             ]
           })
@@ -171,34 +167,37 @@ export class OpenRouterPromptPlanner {
       );
     } catch (error) {
       if (options.signal?.aborted) throw error;
-      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);
     }
 
     if (!response.ok) {
-      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);
     }
 
     let json: { choices?: Array<{ message?: { content?: string } }> };
     try {
       json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
     } catch {
-      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);
     }
     const content = json.choices?.[0]?.message?.content;
-    if (!content) return this.fallbackHooks(hookContext, maxWords, contentLanguage);
+    if (!content) return this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);
 
     try {
-      const parsed = JSON.parse(content) as { hooks?: Array<{ text?: string; angle?: string; score?: number }> };
+      const parsed = JSON.parse(content) as { hooks?: Array<{ text?: string; angle?: string; evidence?: string }> };
       const rawHooks = parsed.hooks
         ?.filter((hook) => hook.text)
-        .map((hook) => ({ text: hook.text!, angle: hook.angle, score: hook.score ?? 0 }));
-      const languageMatchedHooks = contentLanguage === "ru"
-        ? rawHooks?.filter((hook) => isRussianOnlyText(hook.text))
-        : rawHooks;
-      const hooks = normalizeAndRankHooks(languageMatchedHooks ?? [], { context: hookContext, maxWords });
-      return hooks.length ? hooks : this.fallbackHooks(hookContext, maxWords, contentLanguage);
+        .map((hook) => ({ text: hook.text!, angle: hook.angle }));
+      const hooks = rankThumbnailHooks(rawHooks ?? [], {
+        context: hookContext,
+        contentLanguage,
+        sourceTitle,
+        maxWords,
+        limit: 5
+      });
+      return hooks.length ? hooks : this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);
     } catch {
-      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage, sourceTitle);
     }
   }
 
@@ -305,8 +304,21 @@ export class OpenRouterPromptPlanner {
     return this.validatedPlan(prompt, input, undefined, "fallback");
   }
 
-  private fallbackHooks(context: HookContext, maxWords: number | undefined, contentLanguage: ContentLanguage): HookCandidate[] {
-    return buildFallbackHooks(context, maxWords, contentLanguage);
+  private fallbackHooks(
+    context: HookContext,
+    maxWords: number | undefined,
+    contentLanguage: ContentLanguage,
+    sourceTitle?: string
+  ): HookCandidate[] {
+    const candidates = buildFallbackHooks(context, maxWords, contentLanguage);
+    const ranked = rankThumbnailHooks(candidates, {
+      context,
+      contentLanguage,
+      sourceTitle,
+      maxWords,
+      limit: 5
+    });
+    return ranked.length ? ranked : candidates.slice(0, 5);
   }
 
   private templateGuide(input: PromptPlanningInput) {

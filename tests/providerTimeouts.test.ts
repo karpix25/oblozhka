@@ -67,7 +67,7 @@ test("openrouter prompt planning falls back after an invalid provider response",
     assert.equal(plan.model, "fallback");
     assert.match(plan.prompt, /ОШИБКА В ЗАПУСКЕ/);
     assert.match(plan.prompt, /source video is in Russian/i);
-    assert.match(plan.prompt, /Do not add English words/i);
+    assert.match(plan.prompt, /Do not add English words, Latin letters/i);
   });
 });
 

@@ -322,6 +322,7 @@ const hookWorker = new Worker<HookJobData, void, string>(
           platform: project.platform ?? "YOUTUBE",
           contentLanguage,
           theme: project.topicSummary ?? project.transcripts[0]?.cleanText?.slice(0, 300) ?? undefined,
+          sourceTitle: project.topicSummary ?? undefined,
           templateTitle: project.selectedTemplate?.title ?? project.selectedUserStyleAsset?.title ?? undefined,
           templateRules: project.selectedTemplate?.promptRules ?? project.selectedUserStyleAsset?.promptRules ?? undefined,
           designText

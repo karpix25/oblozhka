@@ -1,5 +1,8 @@
 import type { PromptPlanningInput } from "./types.js";
-import { requiresRussianVisualLanguage } from "./languagePrompt.js";
+import {
+  RUSSIAN_VISUAL_LANGUAGE_POLICY,
+  requiresRussianVisualLanguage
+} from "./languagePrompt.js";
 
 export type PromptValidationResult = {
   ok: boolean;
@@ -31,7 +34,7 @@ export function validateImagePrompt(prompt: string, input: PromptPlanningInput):
   if (requiresRussianVisualLanguage(input)) {
     requireAny(
       normalized,
-      ["russian only", "только на русском", "all visible text", "весь видимый текст", "no english words"],
+      ["russian only", "только на русском", "every visible text element", "all visible text", "весь видимый текст", "no english words"],
       "Russian visual language policy",
       issues
     );
@@ -56,7 +59,7 @@ export function repairImagePrompt(prompt: string, input: PromptPlanningInput, is
     input.wizard.guestReferenceImageUrl ? "Guest face role: use Image 2 as a separate second person only; do not blend guest identity with Image 1." : "",
     input.userStyle?.imageUrl ? "User style reference role: use the custom style reference for layout, typography, color and text zones only, never for identity." : "",
     requiresRussianVisualLanguage(input)
-      ? "Russian source language policy: render all visible text, labels, badges, buttons, signs and decorative words in Russian only. Do not add English words, transliteration or pseudo-text."
+      ? `Russian source language policy: ${RUSSIAN_VISUAL_LANGUAGE_POLICY}`
       : "",
     "Template/style references control layout and design only. Do not borrow facial features, hair, expression, age, ethnicity or personal likeness from template/style references.",
     "Preserve text zones, typography feel, subject/object placement, color hierarchy, foreground/background depth.",
