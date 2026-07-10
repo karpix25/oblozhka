@@ -44,6 +44,26 @@ test("openrouter retries retryable responses before parsing a prompt plan", asyn
   });
 });
 
+test("openrouter hook generation falls back after provider failures", async () => {
+  let calls = 0;
+
+  await withFetch(async () => {
+    calls += 1;
+    return new Response("temporary outage", { status: 503 });
+  }, async () => {
+    const planner = new OpenRouterPromptPlanner({ apiKey: "test-key", model: "test-model", timeoutMs: 1000 });
+    const hooks = await planner.generateHooks({
+      transcript: "Видео о запуске продукта и главной ошибке в рекламе.",
+      platform: "YOUTUBE",
+      theme: "запуск продукта"
+    });
+
+    assert.equal(calls, 2);
+    assert.equal(hooks.length, 5);
+    assert.match(hooks[0]?.text ?? "", /ЗАПУСК|ПРОДУКТ/);
+  });
+});
+
 test("media-source timeout wrapper aborts hanging fetches", async () => {
   let aborted = false;
 

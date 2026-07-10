@@ -1,7 +1,7 @@
 import { findProject, getBillingAccess, listTemplates, prisma, selectBestProjectHook, upsertTelegramUser } from "@covers/db";
 import type { BotAbuseGuard } from "../abuseGuard.js";
-import { styleSourceKeyboard } from "../keyboards.js";
-import { platformPrompt, sourcePrompt } from "../messages.js";
+import { platformKeyboard, styleSourceKeyboard } from "../keyboards.js";
+import { platformPrompt } from "../messages.js";
 import { deleteCallbackMessage } from "../navigation.js";
 import { askGuestFace, requiresGuestFace } from "../guestFaceFlow.js";
 import { askReferenceForGeneration } from "../referenceFaceFlow.js";
@@ -10,8 +10,8 @@ import { backHomeKeyboard, projectsKeyboard } from "../sectionKeyboards.js";
 import type { BotContext } from "../session.js";
 import { sendTemplateGallery } from "../templateGallery.js";
 import { profileFromContext } from "../userProfile.js";
-import { platformKeyboard, sourceTypeKeyboard } from "../keyboards.js";
 import { trackProductEvent } from "./analytics.js";
+import { promptForSourceInput } from "./sourceInputFlow.js";
 import { prepareHookJob } from "./hookRetry.js";
 
 export async function enqueueProjectHooks(ctx: BotContext, abuseGuard: BotAbuseGuard, retry = false) {
@@ -30,7 +30,11 @@ export async function enqueueProjectHooks(ctx: BotContext, abuseGuard: BotAbuseG
   await hookQueue.add(
     "generate-hooks",
     { projectId, userTelegramId: ctx.from!.id },
-    { jobId: hookJobId(projectId) }
+    {
+      jobId: hookJobId(projectId),
+      attempts: 3,
+      backoff: { type: "exponential", delay: 2000 }
+    }
   );
   trackProductEvent("hooks_started", { projectId, metadata: { retry } });
   await ctx.reply(retry ? "Пробую подготовить текст ещё раз." : "Анализирую ролик и сам выберу самый сильный текст для обложки.");
@@ -110,13 +114,7 @@ export async function showProjectTemplates(ctx: BotContext) {
 }
 
 export async function showProjectSourcePrompt(ctx: BotContext) {
-  const sourceType = ctx.session.sourceType;
-  if (!sourceType) {
-    await ctx.reply("С чего начнём?", { reply_markup: sourceTypeKeyboard() });
-    return;
-  }
-  ctx.session.step = sourceType === "LINK" ? "sourceLink" : sourceType === "VIDEO" ? "sourceVideo" : "sourceTranscript";
-  await ctx.reply(sourcePrompt(sourceType), { reply_markup: backHomeKeyboard("project:back:sources") });
+  await promptForSourceInput(ctx);
 }
 
 export async function findOwnedProject(ctx: BotContext, projectId: string) {

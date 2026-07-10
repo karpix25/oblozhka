@@ -3,6 +3,7 @@ import type { Context, SessionFlavor } from "grammy";
 
 export type WizardStep =
   | "idle"
+  | "sourceInput"
   | "sourceLink"
   | "sourceTranscript"
   | "sourceVideo"

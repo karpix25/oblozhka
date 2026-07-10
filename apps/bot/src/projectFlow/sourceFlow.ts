@@ -7,10 +7,19 @@ import { backHomeKeyboard, projectsKeyboard } from "../sectionKeyboards.js";
 import type { BotContext } from "../session.js";
 import { profileFromContext } from "../userProfile.js";
 import { trackProductEvent } from "./analytics.js";
+import { canAcceptVideoSource, classifyTextSource } from "./sourceInputFlow.js";
 
 const DEFAULT_VIDEO_LIMIT_BYTES = 20 * 1024 * 1024;
 
 export async function handleProjectTextSource(ctx: BotContext, abuseGuard: BotAbuseGuard) {
+  if (ctx.session.step === "sourceInput") {
+    const classified = classifyTextSource(ctx.message?.text ?? "");
+    if (!classified) return true;
+    if (!(await abuseGuard.consume(ctx, "source-submit"))) return true;
+    await createProjectFromSource(ctx, classified.sourceType, classified.source);
+    return true;
+  }
+
   if (ctx.session.step === "sourceLink") {
     const url = ctx.message?.text?.trim() ?? "";
     if (!/^https?:\/\//i.test(url)) {
@@ -46,8 +55,8 @@ export async function handleProjectVideoSource(
   abuseGuard: BotAbuseGuard,
   video: { fileId: string; mimeType?: string; duration?: number; fileSize?: number }
 ) {
-  if (ctx.session.step !== "sourceVideo") {
-    await ctx.reply("Видео получил. Чтобы использовать его для обложки, нажмите «Создать обложку» → «Загрузить видео».", {
+  if (!canAcceptVideoSource(ctx.session.step)) {
+    await ctx.reply("Видео получил. Чтобы использовать его для обложки, нажмите «Создать обложку» и отправьте файл ещё раз.", {
       reply_markup: projectsKeyboard()
     });
     return;
@@ -85,7 +94,7 @@ export async function handleProjectVideoDocument(
   const document = ctx.message?.document;
   if (!document) return;
   if (!document.mime_type?.startsWith("video/")) {
-    if (ctx.session.step === "sourceVideo") {
+    if (canAcceptVideoSource(ctx.session.step)) {
       await ctx.reply("Нужен видеофайл. Отправьте MP4, MOV или другое видео, а не документ этого типа.", {
         reply_markup: backHomeKeyboard("project:back:sources")
       });

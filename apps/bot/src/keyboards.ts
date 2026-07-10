@@ -31,17 +31,6 @@ export function styleSourceKeyboard(access?: BillingAccess) {
     .text("🏠 В начало", "home");
 }
 
-export function sourceTypeKeyboard() {
-  return new InlineKeyboard()
-    .text("🔗 У меня есть ссылка", "source:LINK")
-    .row()
-    .text("📤 Загрузить видео", "source:VIDEO")
-    .row()
-    .text("📝 Вставить текст ролика", "source:TRANSCRIPT")
-    .row()
-    .text("🏠 В начало", "home");
-}
-
 export function platformKeyboard() {
   return new InlineKeyboard()
     .text("▶️ YouTube · 16:9", "platform:YOUTUBE")

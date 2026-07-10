@@ -90,65 +90,76 @@ export class OpenRouterPromptPlanner {
       return this.fallbackHooks(hookContext, maxWords);
     }
 
-    const response = await fetchOpenRouterText(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${this.apiKey}`,
-          "content-type": "application/json",
-          "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
-          "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+    let response: Awaited<ReturnType<typeof fetchOpenRouterText>>;
+    try {
+      response = await fetchOpenRouterText(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${this.apiKey}`,
+            "content-type": "application/json",
+            "http-referer": process.env.OPENROUTER_SITE_URL ?? "",
+            "x-title": process.env.OPENROUTER_APP_NAME ?? "Cover Bot"
+          },
+          body: JSON.stringify({
+            model: this.model,
+            temperature: 0.55,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: "Ты senior thumbnail editor для YouTube/Reels. Твоя задача — выбрать максимально кликабельный, честный CTR-хук для текста на обложке."
+              },
+              {
+                role: "user",
+                content: [
+                  "Верни JSON: {\"hooks\":[{\"text\":\"...\",\"angle\":\"...\",\"score\":90}]}",
+                  "Нужно 5 коротких русских hook-текстов для обложки. Первый хук должен быть лучшим вариантом для реальной генерации.",
+                  "Оценивай score как прогноз CTR: конкретика, любопытство, визуальная читаемость, связь с темой ролика, сила конфликта.",
+                  "До 5 слов, крупно читается в превью, усиливает конфликт/интригу и не требует объяснений.",
+                  "Каждый хук должен опираться на конкретику из ролика: объект, цифру, цену, ошибку, контраст, результат, потерю, выигрыш, скрытую причину или до/после.",
+                  "Лучшие механики: «ошибка → цена», «скрытая причина», «контраст ожидание/реальность», «цифра/сумма», «что изменилось», «почему не работает», «доказательство объектом».",
+                  "Не используй общие фразы без смысла: Я НЕ ОЖИДАЛ, ТАК НЕЛЬЗЯ, ВСЁ ИЗМЕНИЛОСЬ, ЭТО ВАЖНО, СМОТРИ ДО КОНЦА.",
+                  "Не используй вопрос ради вопроса. Вопрос допустим только если в нём есть конкретный объект, цифра или конфликт.",
+                  "Подбирай CTR-механику под шаблон: contrast, mistake, hidden reason, deadline/countdown, metric, transformation, object proof.",
+                  `Платформа: ${input.platform}.`,
+                  `Тема: ${input.theme ?? "не указана"}.`,
+                  `Шаблон: ${input.templateTitle ?? "не выбран"}.`,
+                  `Правила шаблона: ${input.templateRules ?? "нет"}.`,
+                  input.designText?.summary ? `Ограничения дизайна для текста: ${input.designText.summary}` : "",
+                  input.designText?.maxWords ? `Жёсткий лимит: максимум ${input.designText.maxWords} слов в хуке.` : "",
+                  input.designText?.textPlacement ? `Зона текста: ${input.designText.textPlacement}.` : "",
+                  input.designText?.typography ? `Типографика референса: ${input.designText.typography}.` : "",
+                  "Не предлагай хук, который не поместится в выбранный дизайн или сломает композицию.",
+                  "Текст ролика:",
+                  input.transcript.slice(0, 12000)
+                ].join("\n")
+              }
+            ]
+          })
         },
-        body: JSON.stringify({
-          model: this.model,
-          temperature: 0.55,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: "Ты senior thumbnail editor для YouTube/Reels. Твоя задача — выбрать максимально кликабельный, честный CTR-хук для текста на обложке."
-            },
-            {
-              role: "user",
-              content: [
-                "Верни JSON: {\"hooks\":[{\"text\":\"...\",\"angle\":\"...\",\"score\":90}]}",
-                "Нужно 5 коротких русских hook-текстов для обложки. Первый хук должен быть лучшим вариантом для реальной генерации.",
-                "Оценивай score как прогноз CTR: конкретика, любопытство, визуальная читаемость, связь с темой ролика, сила конфликта.",
-                "До 5 слов, крупно читается в превью, усиливает конфликт/интригу и не требует объяснений.",
-                "Каждый хук должен опираться на конкретику из ролика: объект, цифру, цену, ошибку, контраст, результат, потерю, выигрыш, скрытую причину или до/после.",
-                "Лучшие механики: «ошибка → цена», «скрытая причина», «контраст ожидание/реальность», «цифра/сумма», «что изменилось», «почему не работает», «доказательство объектом».",
-                "Не используй общие фразы без смысла: Я НЕ ОЖИДАЛ, ТАК НЕЛЬЗЯ, ВСЁ ИЗМЕНИЛОСЬ, ЭТО ВАЖНО, СМОТРИ ДО КОНЦА.",
-                "Не используй вопрос ради вопроса. Вопрос допустим только если в нём есть конкретный объект, цифра или конфликт.",
-                "Подбирай CTR-механику под шаблон: contrast, mistake, hidden reason, deadline/countdown, metric, transformation, object proof.",
-                `Платформа: ${input.platform}.`,
-                `Тема: ${input.theme ?? "не указана"}.`,
-                `Шаблон: ${input.templateTitle ?? "не выбран"}.`,
-                `Правила шаблона: ${input.templateRules ?? "нет"}.`,
-                input.designText?.summary ? `Ограничения дизайна для текста: ${input.designText.summary}` : "",
-                input.designText?.maxWords ? `Жёсткий лимит: максимум ${input.designText.maxWords} слов в хуке.` : "",
-                input.designText?.textPlacement ? `Зона текста: ${input.designText.textPlacement}.` : "",
-                input.designText?.typography ? `Типографика референса: ${input.designText.typography}.` : "",
-                "Не предлагай хук, который не поместится в выбранный дизайн или сломает композицию.",
-                "Текст ролика:",
-                input.transcript.slice(0, 12000)
-              ].join("\n")
-            }
-          ]
-        })
-      },
-      {
-        description: "OpenRouter hook generation",
-        signal: options.signal,
-        timeoutMs: this.timeoutMs
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`OpenRouter hook generation failed: ${response.status} ${response.text}`);
+        {
+          description: "OpenRouter hook generation",
+          signal: options.signal,
+          timeoutMs: this.timeoutMs
+        }
+      );
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      return this.fallbackHooks(hookContext, maxWords);
     }
 
-    const json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
+    if (!response.ok) {
+      return this.fallbackHooks(hookContext, maxWords);
+    }
+
+    let json: { choices?: Array<{ message?: { content?: string } }> };
+    try {
+      json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
+    } catch {
+      return this.fallbackHooks(hookContext, maxWords);
+    }
     const content = json.choices?.[0]?.message?.content;
     if (!content) return this.fallbackHooks(hookContext, maxWords);
 

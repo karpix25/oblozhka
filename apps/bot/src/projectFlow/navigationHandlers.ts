@@ -1,8 +1,8 @@
 import { findProject, getBillingAccess, prisma, upsertTelegramUser } from "@covers/db";
 import type { Bot } from "grammy";
 import type { BotAbuseGuard } from "../abuseGuard.js";
-import { platformKeyboard, sourceTypeKeyboard, styleSourceKeyboard } from "../keyboards.js";
-import { platformPrompt, sourceStartMessage } from "../messages.js";
+import { platformKeyboard, styleSourceKeyboard } from "../keyboards.js";
+import { platformPrompt } from "../messages.js";
 import { deleteCallbackMessage } from "../navigation.js";
 import { projectsKeyboard } from "../sectionKeyboards.js";
 import type { BotContext } from "../session.js";
@@ -13,6 +13,7 @@ import {
   showProjectSourcePrompt,
   showProjectTemplates
 } from "./hookFlow.js";
+import { promptForSourceInput } from "./sourceInputFlow.js";
 import { profileFromContext } from "../userProfile.js";
 
 export function registerProjectNavigationHandlers(bot: Bot<BotContext>, abuseGuard: BotAbuseGuard) {
@@ -39,10 +40,9 @@ export function registerProjectNavigationHandlers(bot: Bot<BotContext>, abuseGua
 
 function registerBackHandlers(bot: Bot<BotContext>) {
   bot.callbackQuery("project:back:sources", async (ctx) => {
-    ctx.session.step = "idle";
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(sourceStartMessage(), { reply_markup: sourceTypeKeyboard() });
+    await promptForSourceInput(ctx);
   });
   bot.callbackQuery("project:back:source", async (ctx) => {
     await ctx.answerCallbackQuery();

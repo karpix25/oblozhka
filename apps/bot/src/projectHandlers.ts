@@ -14,13 +14,12 @@ import type { ProjectPlatform, SourceType } from "@covers/domain";
 import type { Bot } from "grammy";
 import type { BotAbuseGuard } from "./abuseGuard.js";
 import { openFaceLibrary } from "./faceLibrary.js";
-import { platformKeyboard, sourceTypeKeyboard, styleSourceKeyboard } from "./keyboards.js";
+import { platformKeyboard, styleSourceKeyboard } from "./keyboards.js";
 import { askGuestFace, requiresGuestFace, useSavedGuestFace } from "./guestFaceFlow.js";
 import {
   platformPrompt,
   referenceForGenerationPrompt,
   sourcePrompt,
-  sourceStartMessage,
 } from "./messages.js";
 import { deleteCallbackMessage } from "./navigation.js";
 import { sendProjectList } from "./projectList.js";
@@ -36,6 +35,7 @@ import {
   handleProjectVideoDocument,
   handleProjectVideoSource,
 } from "./projectFlow/sourceFlow.js";
+import { promptForSourceInput, sourceStepForType } from "./projectFlow/sourceInputFlow.js";
 import { enqueueProjectHooks, findOwnedProject } from "./projectFlow/hookFlow.js";
 import { trackProductEvent } from "./projectFlow/analytics.js";
 import { enqueueGenerationFromReference } from "./projectFlow/referenceGenerationFlow.js";
@@ -51,7 +51,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
     resetWizard(ctx);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
-    await ctx.reply(sourceStartMessage(), { reply_markup: sourceTypeKeyboard() });
+    await promptForSourceInput(ctx);
   });
 
   bot.callbackQuery("projects:mine", async (ctx) => {
@@ -149,7 +149,7 @@ export function registerProjectHandlers(bot: Bot<BotContext>, token: string, abu
     const sourceType = ctx.match[1] as SourceType;
     ctx.session.sourceType = sourceType;
     trackProductEvent("source_type_selected", { metadata: { sourceType, telegramId: ctx.from.id } });
-    ctx.session.step = sourceType === "LINK" ? "sourceLink" : sourceType === "VIDEO" ? "sourceVideo" : "sourceTranscript";
+    ctx.session.step = sourceStepForType(sourceType);
     await ctx.answerCallbackQuery();
     await deleteCallbackMessage(ctx);
     await ctx.reply(sourcePrompt(sourceType), { reply_markup: backHomeKeyboard("project:back:sources") });

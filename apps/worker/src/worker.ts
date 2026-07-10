@@ -293,15 +293,15 @@ const hookWorker = new Worker<HookJobData, void, string>(
     }
 
     const progress = await notifier.sendHookProgress(job.data.userTelegramId).catch(() => undefined);
+    let hookProgressCompleted = false;
     try {
       await withJobDeadline("Hook job", positiveIntegerEnv("HOOK_JOB_TIMEOUT_MS", 10 * 60 * 1000), async (signal) => {
         await markProjectStatus(prisma, project.id, "HOOKS_PENDING");
-        await notifier.updateHookProgress(progress, "Изучаю источник и выделяю главную мысль");
-        const transcript = await ensureProjectTranscript(project, signal);
+        const transcript = await ensureProjectTranscriptSafely(project, signal);
         throwIfAborted(signal, "Hook job");
-        const textForHooks = transcript ?? "Пользователь загрузил видео без транскрипта.";
+        const textForHooks = transcript ?? project.topicSummary ?? "видео";
         const designText = deriveDesignTextConstraints(project.selectedTemplate ?? project.selectedUserStyleAsset ?? undefined);
-        await notifier.updateHookProgress(progress, "Подбираю лучший CTR-текст под выбранный шаблон");
+        await notifier.updateHookProgress(progress, "generation");
         const hooks = await promptPlanner.generateHooks({
           transcript: textForHooks,
           platform: project.platform ?? "YOUTUBE",
@@ -311,6 +311,7 @@ const hookWorker = new Worker<HookJobData, void, string>(
           designText
         }, { signal });
         throwIfAborted(signal, "Hook job");
+        await notifier.updateHookProgress(progress, "selection");
         const savedHooks = await replaceProjectHooks(prisma, project.id, hooks);
         const selectedProject = await selectBestProjectHook(prisma, project.id);
         await markProjectStatus(prisma, project.id, "HOOKS_READY");
@@ -326,7 +327,9 @@ const hookWorker = new Worker<HookJobData, void, string>(
           projectId: project.id,
           metadata: { mode: "auto_worker", hookId: selectedProject.selectedHook?.id }
         });
+        await notifier.updateHookProgress(progress, "ready");
         await notifier.sendAutoHookReady(job.data.userTelegramId, project.id, selectedProject.selectedHook?.text);
+        hookProgressCompleted = true;
       });
     } catch (error) {
       if (isFinalAttempt(job)) {
@@ -335,7 +338,7 @@ const hookWorker = new Worker<HookJobData, void, string>(
       }
       throw error;
     } finally {
-      await notifier.finishHookProgress(progress);
+      await notifier.finishHookProgress(progress, hookProgressCompleted);
     }
   },
   buildWorkerOptions({
@@ -375,6 +378,22 @@ async function ensureProjectTranscript(project: NonNullable<Awaited<ReturnType<t
 
   await markProjectStatus(prisma, project.id, "SOURCE_READY");
   return result.text;
+}
+
+async function ensureProjectTranscriptSafely(
+  project: NonNullable<Awaited<ReturnType<typeof findProject>>>,
+  signal: AbortSignal
+) {
+  try {
+    return await ensureProjectTranscript(project, signal);
+  } catch (error) {
+    throwIfAborted(signal, "Hook job");
+    console.warn("Transcript resolution failed; continuing with fallback hook context", {
+      projectId: project.id,
+      error
+    });
+    return undefined;
+  }
 }
 
 async function trackProductEvent(input: Parameters<typeof recordProductEvent>[1]) {

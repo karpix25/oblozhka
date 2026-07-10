@@ -1,5 +1,6 @@
 import { MODERNIZATION_ACTIONS, modernizationActionLabel, type PaidPlan } from "@covers/domain";
 import { Bot, InputFile } from "grammy";
+import { hookProgressText, type HookProgressStage } from "./hookProgress.js";
 
 type GenerationDelivery = {
   generationId: string;
@@ -91,16 +92,17 @@ export class TelegramNotifier {
   }
 
   async sendHookProgress(chatId: number) {
-    const message = await this.bot.api.sendMessage(chatId, projectProgressText("Изучаю ролик и выделяю главную мысль"));
+    const message = await this.bot.api.sendMessage(chatId, hookProgressText("source"));
     return { chatId, messageId: message.message_id };
   }
 
-  async updateHookProgress(progress: GenerationProgressMessage | undefined, stage: string) {
+  async updateHookProgress(progress: GenerationProgressMessage | undefined, stage: HookProgressStage) {
     if (!progress) return;
-    await this.bot.api.editMessageText(progress.chatId, progress.messageId, projectProgressText(stage)).catch(() => undefined);
+    await this.bot.api.editMessageText(progress.chatId, progress.messageId, hookProgressText(stage)).catch(() => undefined);
   }
 
-  async finishHookProgress(progress: GenerationProgressMessage | undefined) {
+  async finishHookProgress(progress: GenerationProgressMessage | undefined, completed: boolean) {
+    if (completed) return;
     await this.finishGenerationProgress(progress);
   }
 
@@ -126,15 +128,6 @@ function generationProgressText(stage: string) {
     "",
     `Сейчас: ${stage}.`,
     "Я пришлю результат сюда, когда генерация завершится."
-  ].join("\n");
-}
-
-function projectProgressText(stage: string) {
-  return [
-    "⏳ Подбираю текст для обложки",
-    "",
-    `Сейчас: ${stage}.`,
-    "Можно закрыть Telegram — я пришлю следующий шаг сюда."
   ].join("\n");
 }
 

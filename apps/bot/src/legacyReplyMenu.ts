@@ -2,10 +2,9 @@ import { getBillingAccess, listTemplates, prisma, upsertTelegramUser } from "@co
 import { balanceMessage } from "./billingMessages.js";
 import { documentsKeyboard, supportMessage, tariffsMessage } from "./compliance.js";
 import { openFaceLibrary } from "./faceLibrary.js";
-import { sourceTypeKeyboard } from "./keyboards.js";
-import { sourceStartMessage } from "./messages.js";
 import { openCoverHistory } from "./projectHandlers.js";
 import { sendProjectList } from "./projectList.js";
+import { promptForSourceInput } from "./projectFlow/sourceInputFlow.js";
 import { balanceKeyboard, tariffsKeyboard } from "./sectionKeyboards.js";
 import { menuIntentFromText } from "./menuIntent.js";
 import { resetWizard, type BotContext } from "./session.js";
@@ -30,7 +29,7 @@ export async function handleLegacyReplyMenuText(ctx: BotContext) {
 
   if (intent === "create") {
     resetWizard(ctx);
-    await ctx.reply(sourceStartMessage(), { reply_markup: sourceTypeKeyboard() });
+    await promptForSourceInput(ctx);
     return true;
   }
 
