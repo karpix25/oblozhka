@@ -75,6 +75,33 @@ export type AdminAnalyticsSummary = {
   subscriptions: {
     activeByPlan: Record<"START" | "PRO" | "BUSINESS", number>;
   };
+  cjm?: CjmAnalytics;
+};
+
+export type PercentileMetric = {
+  sampleSize: number;
+  p50Ms: number | null;
+  p90Ms: number | null;
+};
+
+export type CjmAnalytics = {
+  windowDays: number;
+  funnel: Array<{
+    name: string;
+    count: number;
+    conversionFromPrevious: number | null;
+    conversionFromStart: number | null;
+  }>;
+  journeyDurations: {
+    sourceToTemplates: PercentileMetric;
+    hooksPreparation: PercentileMetric;
+    timeToGeneration: PercentileMetric;
+  };
+  generationDurations: {
+    queue: PercentileMetric;
+    processing: PercentileMetric;
+    total: PercentileMetric;
+  };
 };
 
 export type WindowCounts = {

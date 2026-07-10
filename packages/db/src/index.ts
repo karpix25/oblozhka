@@ -7,6 +7,8 @@ export * from "./generations.js";
 export * from "./hooks.js";
 export * from "./packages.js";
 export * from "./payments.js";
+export * from "./productAnalytics.js";
+export * from "./productEvents.js";
 export * from "./presets.js";
 export * from "./projects.js";
 export * from "./subscriptions.js";

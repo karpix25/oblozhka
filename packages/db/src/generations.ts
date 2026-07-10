@@ -1,7 +1,14 @@
-import { designRequiresGuestFace, getModernizationAction, type ModernizationActionId, type ProjectPlatform, type WizardInput } from "@covers/domain";
+import {
+  getModernizationAction,
+  type ModernizationActionId,
+  type WizardInput
+} from "@covers/domain";
 import { serializeAdminUser } from "./adminSerializers.js";
 import type { DbClient } from "./client.js";
 import { debitGenerationCreditInTransaction, refundGenerationCreditInTransaction } from "./credits.js";
+import { generationBillingData } from "./generationBilling.js";
+
+export { createGenerationFromProject } from "./projectGenerations.js";
 
 export async function createGeneration(
   db: DbClient,
@@ -36,78 +43,6 @@ export async function createGeneration(
         data: generationBillingData(access)
       });
     }
-
-    return tx.generation.findUniqueOrThrow({ where: { id: generation.id } });
-  });
-}
-
-export async function createGenerationFromProject(
-  db: DbClient,
-  input: { projectId: string; userId: string; referenceImageUrl: string; chargeCredits?: boolean }
-) {
-  return db.$transaction(async (tx) => {
-    const project = await tx.project.findUniqueOrThrow({
-      where: { id: input.projectId },
-      include: {
-        selectedHook: true,
-        selectedTemplate: true,
-        selectedUserStyleAsset: true,
-        guestFaceAsset: true,
-        transcripts: true,
-        sourceAssets: true
-      }
-    });
-
-    if (!project.selectedHook || !project.platform || (!project.selectedTemplate && !project.selectedUserStyleAsset)) {
-      throw new Error("Project must have platform, style/template and selected hook before generation.");
-    }
-    if (designRequiresGuestFace(project.selectedTemplate) && !project.guestFaceAsset) {
-      throw new Error("This template requires a second face reference.");
-    }
-
-    const format = formatForPlatform(project.platform);
-    const topic = project.topicSummary ?? project.transcripts[0]?.cleanText ?? project.transcripts[0]?.rawText ?? "Обложка по ролику";
-    const creditCost = input.chargeCredits ? 1 : 0;
-    const generation = await tx.generation.create({
-      data: {
-        userId: input.userId,
-        projectId: input.projectId,
-        templateId: project.selectedTemplate?.id,
-        userStyleAssetId: project.selectedUserStyleAsset?.id,
-        styleSource: project.styleSource,
-        hookCandidateId: project.selectedHook.id,
-        platform: project.platform,
-        format,
-        referenceMode: project.platform === "FACELESS" ? "REFERENCE" : "FACE",
-        referenceImageUrl: input.referenceImageUrl,
-        guestFaceAssetId: project.guestFaceAssetId,
-        guestReferenceImageUrl: project.guestFaceAsset?.imageUrl,
-        topic,
-        hookText: project.selectedHook.text,
-        niche: project.platform,
-        style: project.selectedTemplate?.title ?? project.selectedUserStyleAsset?.title ?? "Пользовательский стиль",
-        prompt: "Prompt will be planned by OpenRouter in the worker.",
-        creditCost
-      }
-    });
-
-    if (generation.creditCost > 0) {
-      const { access } = await debitGenerationCreditInTransaction(tx, {
-        userId: input.userId,
-        amount: generation.creditCost,
-        referenceId: generation.id,
-        note: "Project thumbnail generation"
-      });
-      await tx.generation.update({
-        where: { id: generation.id },
-        data: generationBillingData(access)
-      });
-    }
-
-    await tx.project.update({
-      where: { id: input.projectId },
-      data: { status: "GENERATION_PENDING" }
-    });
 
     return tx.generation.findUniqueOrThrow({ where: { id: generation.id } });
   });
@@ -208,25 +143,16 @@ export async function chargeGenerationCreditOnSuccess(db: DbClient, id: string, 
   });
 }
 
-function generationBillingData(access: Awaited<ReturnType<typeof debitGenerationCreditInTransaction>>["access"]) {
-  if (access.kind === "subscription") {
-    return {
-      chargedPlan: access.plan,
-      chargedSubscriptionId: access.subscriptionId,
-      queuePriority: access.queuePriority
-    };
-  }
-  return { queuePriority: access.queuePriority };
-}
-
-function formatForPlatform(platform: ProjectPlatform) {
-  return platform === "YOUTUBE" ? "YOUTUBE" : "VERTICAL";
-}
-
 export async function markGenerationProcessing(db: DbClient, id: string) {
-  return db.generation.update({
-    where: { id },
-    data: { status: "PROCESSING" }
+  return db.$transaction(async (tx) => {
+    await tx.generation.updateMany({
+      where: { id, startedAt: null },
+      data: { startedAt: new Date() }
+    });
+    return tx.generation.update({
+      where: { id },
+      data: { status: "PROCESSING" }
+    });
   });
 }
 
@@ -248,16 +174,17 @@ export async function markGenerationSucceeded(
 ) {
   return db.generation.update({
     where: { id },
-    data: { status: "SUCCEEDED", ...data }
+    data: { status: "SUCCEEDED", finishedAt: new Date(), ...data }
   });
 }
 
 export async function markGenerationFailed(db: DbClient, id: string, errorMessage: string) {
-  return db.$transaction(async (tx) => {
-    const generation = await tx.generation.update({
+  try {
+    return await db.$transaction(async (tx) => {
+      const generation = await tx.generation.update({
       where: { id },
-      data: { status: "FAILED", errorMessage }
-    });
+      data: { status: "FAILED", errorMessage, finishedAt: new Date() }
+      });
 
     const existingRefund = await tx.creditLedgerEntry.findFirst({
       where: {
@@ -277,8 +204,18 @@ export async function markGenerationFailed(db: DbClient, id: string, errorMessag
       });
     }
 
-    return generation;
-  });
+      return generation;
+    });
+  } catch (error) {
+    if (isUniqueConflict(error)) {
+      return db.generation.findUniqueOrThrow({ where: { id } });
+    }
+    throw error;
+  }
+}
+
+function isUniqueConflict(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
 export async function findGeneration(db: DbClient, id: string) {

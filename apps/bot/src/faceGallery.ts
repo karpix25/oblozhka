@@ -18,7 +18,8 @@ export async function sendFaceGallery(
   input: { mode: FaceGalleryMode; page?: number; replace?: boolean }
 ) {
   if (faces.length === 0) {
-    await ctx.reply(emptyCaption(input.mode), { reply_markup: backHomeKeyboard() });
+    const backCallback = input.mode === "reference" ? "project:back:hooks" : "home";
+    await ctx.reply(emptyCaption(input.mode), { reply_markup: backHomeKeyboard(backCallback) });
     return;
   }
 
@@ -60,7 +61,7 @@ function faceGalleryKeyboard(input: { mode: FaceGalleryMode; page: number; total
   }
 
   if (input.mode === "reference") {
-    keyboard.text("✅ Выбрать этот аватар", `referenceface:use:${input.faceId}`).row();
+    keyboard.text("🚀 Создать с этим лицом · 1 генерация", `referenceface:use:${input.faceId}`).row();
   }
   if (input.mode === "guest") {
     keyboard.text("✅ Выбрать этого гостя", `guestface:use:${input.faceId}`).row();
@@ -69,9 +70,10 @@ function faceGalleryKeyboard(input: { mode: FaceGalleryMode; page: number; total
   if (input.mode === "browse") {
     keyboard.text("🎨 Создать обложку", "project:start").row();
   } else {
-    keyboard.text("📤 Загрузить новое фото", uploadCallback(input.mode)).row();
+    keyboard.text("📤 Загрузить новое фото · 1 генерация", uploadCallback(input.mode)).row();
   }
 
+  if (input.mode === "reference") keyboard.text("⬅️ Назад", "project:back:hooks");
   keyboard.text("🏠 В начало", "home");
   return keyboard;
 }

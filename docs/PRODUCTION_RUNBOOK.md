@@ -38,6 +38,17 @@ npm run build
 - [ ] Если менялись очереди/генерация, отдельно проверить worker на тестовой задаче.
 - [ ] Проверить `.env.docker` или secret store production: нет `change-me`, пустых ключей и local URL.
 - [ ] Проверить backup БД перед миграцией, если миграция меняет структуру данных.
+- [ ] Перед миграцией `20260710000100_add_product_events_and_generation_timing` убедиться, что финансовый ledger не содержит дублей одного основания:
+
+```sql
+SELECT "userId", reason, "referenceId", COUNT(*)
+FROM "CreditLedgerEntry"
+WHERE "referenceId" IS NOT NULL
+GROUP BY "userId", reason, "referenceId"
+HAVING COUNT(*) > 1;
+```
+
+  Запрос должен вернуть 0 строк. Если он находит дубли, остановить deploy и сверить баланс пользователя с ledger; не удалять финансовые строки автоматически.
 - [ ] Согласовать окно релиза, если ожидается downtime или долгие migrations.
 
 Минимальные smoke-checks после сборки:

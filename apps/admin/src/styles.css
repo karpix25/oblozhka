@@ -105,6 +105,31 @@ h1 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.duration-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.duration-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+}
+
+.duration-card span,
+.duration-card small {
+  color: #64748b;
+}
+
+.analytics-table-scroll {
+  overflow-x: auto;
+}
+
 .metric-card,
 .panel {
   background: #ffffff;
@@ -217,7 +242,8 @@ th {
 @media (max-width: 860px) {
   .metric-grid,
   .panel-grid,
-  .status-grid {
+  .status-grid,
+  .duration-grid {
     grid-template-columns: 1fr;
   }
 

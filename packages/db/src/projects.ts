@@ -1,4 +1,4 @@
-import type { ProjectPlatform, SourceType } from "@covers/domain";
+import { assertTemplateCompatibleWithPlatform, type ProjectPlatform, type SourceType } from "@covers/domain";
 import type { DbClient } from "./client.js";
 
 export type CreateProjectInput = {
@@ -40,18 +40,51 @@ export async function createProject(db: DbClient, input: CreateProjectInput) {
 }
 
 export async function setProjectPlatform(db: DbClient, projectId: string, platform: ProjectPlatform) {
-  return db.project.update({
-    where: { id: projectId },
-    data: { platform },
-    include: { sourceAssets: true, transcripts: true }
+  return db.$transaction(async (tx) => {
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { platform: true }
+    });
+    if (project.platform !== platform) {
+      await tx.hookCandidate.deleteMany({ where: { projectId } });
+    }
+    return tx.project.update({
+      where: { id: projectId },
+      data: project.platform === platform
+        ? { platform }
+        : {
+            platform,
+            status: "SOURCE_READY",
+            selectedTemplateId: null,
+            selectedUserStyleAssetId: null,
+            selectedHookId: null,
+            guestFaceAssetId: null,
+            errorMessage: null
+          },
+      include: { sourceAssets: true, transcripts: true }
+    });
   });
 }
 
 export async function setProjectTemplate(db: DbClient, projectId: string, templateId: string) {
-  return db.project.update({
-    where: { id: projectId },
-    data: { selectedTemplateId: templateId, selectedUserStyleAssetId: null, styleSource: "LIBRARY_TEMPLATE" },
-    include: { selectedTemplate: true, selectedUserStyleAsset: true, sourceAssets: true, transcripts: true }
+  return db.$transaction(async (tx) => {
+    const [project, template] = await Promise.all([
+      tx.project.findUniqueOrThrow({ where: { id: projectId }, select: { platform: true } }),
+      tx.template.findUniqueOrThrow({ where: { id: templateId } })
+    ]);
+    if (!project.platform) {
+      throw new Error("Choose the project platform before selecting a template.");
+    }
+    if (!template.isActive) {
+      throw new Error("This template is not available.");
+    }
+    assertTemplateCompatibleWithPlatform(project.platform, template);
+
+    return tx.project.update({
+      where: { id: projectId },
+      data: { selectedTemplateId: templateId, selectedUserStyleAssetId: null, styleSource: "LIBRARY_TEMPLATE" },
+      include: { selectedTemplate: true, selectedUserStyleAsset: true, sourceAssets: true, transcripts: true }
+    });
   });
 }
 

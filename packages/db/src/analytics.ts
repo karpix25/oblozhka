@@ -1,5 +1,6 @@
 import { PAID_PLAN_ORDER } from "@covers/domain";
 import type { DbClient } from "./client.js";
+import { getCjmAnalytics, type CjmAnalytics } from "./productAnalytics.js";
 
 const GENERATION_STATUSES = ["QUEUED", "PROCESSING", "SUCCEEDED", "FAILED"] as const;
 
@@ -22,6 +23,7 @@ export type AdminAnalyticsSummary = {
   subscriptions: {
     activeByPlan: Record<(typeof PAID_PLAN_ORDER)[number], number>;
   };
+  cjm: CjmAnalytics;
 };
 
 type WindowCounts = {
@@ -51,7 +53,8 @@ export async function getAdminAnalyticsSummary(
     activeUsers30Days,
     generationGroups,
     paymentTotals,
-    subscriptionGroups
+    subscriptionGroups,
+    cjm
   ] = await Promise.all([
     db.user.count(),
     countUsersSince(db, "createdAt", windows.today),
@@ -76,7 +79,8 @@ export async function getAdminAnalyticsSummary(
         currentPeriodEnd: { gte: now }
       },
       _count: { _all: true }
-    })
+    }),
+    getCjmAnalytics(db, { now })
   ]);
 
   const successfulCount = paymentTotals._count._all;
@@ -108,7 +112,8 @@ export async function getAdminAnalyticsSummary(
     },
     subscriptions: {
       activeByPlan: countsByKey(PAID_PLAN_ORDER, subscriptionGroups)
-    }
+    },
+    cjm
   };
 }
 

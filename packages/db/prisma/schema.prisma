@@ -117,6 +117,7 @@ model User {
   generations    Generation[]
   faceAssets     UserFaceAsset[]
   styleAssets    UserStyleAsset[]
+  productEvents  ProductEvent[]
 
   @@index([status, createdAt])
   @@index([lastSeenAt])
@@ -177,6 +178,8 @@ model CreditLedgerEntry {
   note         String?
   createdAt    DateTime     @default(now())
   user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([userId, reason, referenceId])
 }
 
 model CreditPackage {
@@ -274,6 +277,7 @@ model Project {
   selectedTemplate Template?        @relation(fields: [selectedTemplateId], references: [id])
   selectedUserStyleAsset UserStyleAsset? @relation(fields: [selectedUserStyleAssetId], references: [id])
   guestFaceAsset UserFaceAsset?     @relation("ProjectGuestFaceAsset", fields: [guestFaceAssetId], references: [id])
+  productEvents  ProductEvent[]
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -375,6 +379,10 @@ model Generation {
   providerTaskId String?
   providerMeta  Json?
   errorMessage  String?
+  requestKey    String?          @unique
+  queuedAt      DateTime         @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   user          User             @relation(fields: [userId], references: [id])
@@ -384,6 +392,7 @@ model Generation {
   userStyleAsset UserStyleAsset? @relation(fields: [userStyleAssetId], references: [id])
   hookCandidate HookCandidate?   @relation(fields: [hookCandidateId], references: [id])
   guestFaceAsset UserFaceAsset?   @relation("GenerationGuestFaceAsset", fields: [guestFaceAssetId], references: [id])
+  productEvents ProductEvent[]
 
   @@index([projectId, createdAt])
   @@index([status, createdAt])
@@ -392,6 +401,27 @@ model Generation {
   @@index([userStyleAssetId])
   @@index([providerTaskId])
   @@index([chargedSubscriptionId])
+  @@index([queuedAt])
+  @@index([finishedAt])
+}
+
+model ProductEvent {
+  id           String      @id @default(cuid())
+  name         String
+  userId       String?
+  projectId    String?
+  generationId String?
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project      Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  generation   Generation? @relation(fields: [generationId], references: [id], onDelete: SetNull)
+
+  @@index([name, createdAt])
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([generationId, createdAt])
+  @@index([createdAt])
 }
 
 model AdminUser {

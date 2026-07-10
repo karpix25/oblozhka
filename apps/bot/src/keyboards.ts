@@ -28,6 +28,7 @@ export function styleSourceKeyboard(access?: BillingAccess) {
     .row()
     .text(customStyleSourceLabel(access), "style-source:custom")
     .row()
+    .text("⬅️ Назад", "project:back:platform")
     .text("🏠 В начало", "home");
 }
 
@@ -44,12 +45,13 @@ export function sourceTypeKeyboard() {
 
 export function platformKeyboard() {
   return new InlineKeyboard()
-    .text("▶️ YouTube", "platform:YOUTUBE")
+    .text("▶️ YouTube · 16:9", "platform:YOUTUBE")
     .row()
-    .text("📱 Reels/TikTok", "platform:INSTAGRAM_TIKTOK")
+    .text("📱 Reels/TikTok · 9:16", "platform:INSTAGRAM_TIKTOK")
     .row()
-    .text("🎭 Faceless", "platform:FACELESS")
+    .text("🎭 Без лица · 16:9", "platform:FACELESS")
     .row()
+    .text("⬅️ Назад", "project:back:source")
     .text("🏠 В начало", "home");
 }
 

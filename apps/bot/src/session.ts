@@ -1,4 +1,4 @@
-import type { WizardInput } from "@covers/domain";
+import type { SourceType, WizardInput } from "@covers/domain";
 import type { Context, SessionFlavor } from "grammy";
 
 export type WizardStep =
@@ -16,6 +16,7 @@ export type WizardStep =
 export type BotSession = {
   step: WizardStep;
   projectId?: string;
+  sourceType?: SourceType;
   templateGalleryMode?: "browse" | "select";
   faceGalleryMode?: "browse" | "reference" | "guest";
   modernization?: { generationId: string; actionId: string };
@@ -31,6 +32,7 @@ export function initialSession(): BotSession {
 export function resetWizard(ctx: BotContext) {
   ctx.session.step = "idle";
   ctx.session.projectId = undefined;
+  ctx.session.sourceType = undefined;
   ctx.session.templateGalleryMode = undefined;
   ctx.session.faceGalleryMode = undefined;
   ctx.session.modernization = undefined;

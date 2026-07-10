@@ -30,7 +30,7 @@ export async function openStyleLibrary(ctx: BotContext, input: { fromCallback?: 
   const styles = await listUserStyleAssets(prisma, { userId: user.id, statuses: ["READY"], take: 20 });
   if (styles.length === 0) {
     await ctx.reply("Своих стилей пока нет. Загрузите референс-обложку, и я сохраню её стиль для следующих генераций.", {
-      reply_markup: styleLibraryKeyboard({ access, hasStyles: false })
+      reply_markup: styleLibraryKeyboard({ access, hasStyles: false, selectForProject: Boolean(input.selectForProject) })
     });
     return;
   }
@@ -59,7 +59,7 @@ export async function startStyleUpload(ctx: BotContext, options: StyleUploadOpti
     await deleteCallbackMessage(ctx).catch(() => undefined);
   }
   await ctx.reply(options.prompt ?? "Отправьте картинку-референс: обложку или кадр, стиль которого нужно сохранить.", {
-    reply_markup: backHomeKeyboard()
+    reply_markup: backHomeKeyboard(ctx.session.projectId ? "project:back:style-source" : "home")
   });
 }
 
@@ -72,7 +72,7 @@ export async function saveUploadedStyle(ctx: BotContext, token: string) {
   const file = await ctx.api.getFile(photo.file_id);
   if (!file.file_path) {
     await ctx.reply("Не получилось прочитать картинку. Попробуйте отправить изображение ещё раз.", {
-      reply_markup: backHomeKeyboard()
+      reply_markup: backHomeKeyboard(ctx.session.projectId ? "project:back:style-source" : "home")
     });
     return true;
   }
@@ -92,7 +92,7 @@ export async function saveUploadedStyle(ctx: BotContext, token: string) {
   ctx.session.step = "idle";
   const access = await getBillingAccess(prisma, user.id);
   await ctx.reply("Стиль сохранён. Теперь его можно выбрать при создании обложки.", {
-    reply_markup: styleLibraryKeyboard({ access, hasStyles: true })
+    reply_markup: styleLibraryKeyboard({ access, hasStyles: true, selectForProject: Boolean(ctx.session.projectId) })
   });
   return true;
 }
@@ -113,10 +113,15 @@ export async function selectUserStyleForProject(ctx: BotContext, styleId: string
   return true;
 }
 
-function styleLibraryKeyboard(input: { access: Awaited<ReturnType<typeof getBillingAccess>>; hasStyles: boolean }) {
+function styleLibraryKeyboard(input: {
+  access: Awaited<ReturnType<typeof getBillingAccess>>;
+  hasStyles: boolean;
+  selectForProject?: boolean;
+}) {
   const keyboard = new InlineKeyboard().text(customStyleUploadLabel(input.access), "styles:upload");
   if (input.hasStyles) keyboard.row().text("🎨 Создать обложку", "project:start");
-  keyboard.row().text("🏠 В начало", "home");
+  if (input.selectForProject) keyboard.row().text("⬅️ Назад", "project:back:style-source");
+  keyboard.text("🏠 В начало", "home");
   return keyboard;
 }
 
@@ -128,6 +133,7 @@ function styleListKeyboard(
   styles.forEach((style) => keyboard.text(style.title ?? "Пользовательский стиль", `style:use:${style.id}`).row());
   keyboard.text(customStyleUploadLabel(input.access), "styles:upload").row();
   if (!input.selectForProject) keyboard.text("🎨 Создать обложку", "project:start").row();
+  if (input.selectForProject) keyboard.text("⬅️ Назад", "project:back:style-source").row();
   keyboard.text("🏠 В начало", "home");
   return keyboard;
 }

@@ -7,6 +7,7 @@ type QueuedGeneration = {
   id: string;
   queuePriority: number;
   projectId?: string | null;
+  creditCost?: number;
 };
 
 type EnqueueDeps = {
@@ -65,7 +66,10 @@ async function compensateGenerationEnqueueFailure(
     if (generation.projectId) {
       await deps.markProject(prisma, generation.projectId, "FAILED", message);
     }
-    throw new GenerationEnqueueError("Очередь генераций временно недоступна. Кредит возвращён, попробуйте ещё раз через минуту.", {
+    const userMessage = generation.creditCost && generation.creditCost > 0
+      ? "Очередь генераций временно недоступна. Генерация возвращена на баланс, попробуйте ещё раз через минуту."
+      : "Очередь генераций временно недоступна. Списания не было, попробуйте ещё раз через минуту.";
+    throw new GenerationEnqueueError(userMessage, {
       compensationSucceeded: true,
       enqueueError
     });

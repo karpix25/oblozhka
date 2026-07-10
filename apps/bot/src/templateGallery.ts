@@ -79,11 +79,14 @@ function templateGalleryKeyboard(input: {
   total: number;
   templateId: string;
 }) {
-  const keyboard = new InlineKeyboard()
-    .text(platformTab("▶️ YouTube", input.platform === "YOUTUBE"), "templates:browse:YOUTUBE:0")
-    .text(platformTab("📱 Reels/TikTok", input.platform === "INSTAGRAM_TIKTOK"), "templates:browse:INSTAGRAM_TIKTOK:0")
-    .text(platformTab("🎭 Faceless", input.platform === "FACELESS"), "templates:browse:FACELESS:0")
-    .row();
+  const keyboard = new InlineKeyboard();
+  if (input.mode === "browse") {
+    keyboard
+      .text(platformTab("▶️ YouTube", input.platform === "YOUTUBE"), "templates:browse:YOUTUBE:0")
+      .text(platformTab("📱 Reels/TikTok", input.platform === "INSTAGRAM_TIKTOK"), "templates:browse:INSTAGRAM_TIKTOK:0")
+      .text(platformTab("🎭 Без лица", input.platform === "FACELESS"), "templates:browse:FACELESS:0")
+      .row();
+  }
 
   if (input.total > 1) {
     keyboard
@@ -99,6 +102,7 @@ function templateGalleryKeyboard(input: {
     keyboard.text("🎨 Создать обложку", "project:start").row();
   }
 
+  if (input.mode === "select") keyboard.text("⬅️ Назад", "project:back:templates");
   keyboard.text("🏠 В начало", "home");
   return keyboard;
 }

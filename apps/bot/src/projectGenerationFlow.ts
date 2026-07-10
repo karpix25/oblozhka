@@ -15,7 +15,8 @@ export async function createAndEnqueueProjectGeneration(
       projectId: ctx.session.projectId,
       userId: input.userId,
       referenceImageUrl: input.referenceImageUrl,
-      chargeCredits: true
+      chargeCredits: true,
+      requestKey: generationRequestKey(ctx)
     });
     await enqueueGenerationOrCompensate(generation, ctx.from!.id);
     return true;
@@ -27,4 +28,10 @@ export async function createAndEnqueueProjectGeneration(
     });
     return false;
   }
+}
+
+function generationRequestKey(ctx: BotContext) {
+  if (ctx.callbackQuery?.id) return `callback:${ctx.callbackQuery.id}`;
+  if (ctx.message?.message_id) return `message:${ctx.chat?.id ?? ctx.from?.id}:${ctx.message.message_id}`;
+  return undefined;
 }

@@ -7,6 +7,7 @@ import {
   markGenerationSucceeded,
   markProjectStatus,
   prisma,
+  recordProductEvent,
   replaceProjectHooks,
   updateGenerationPrompt,
   upsertProjectTranscript
@@ -82,6 +83,12 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
 
     let persistedSuccess = false;
     await markGenerationProcessing(prisma, generation.id);
+    await trackProductEvent({
+      name: "generation_started",
+      userId: generation.userId,
+      projectId: generation.projectId ?? undefined,
+      generationId: generation.id
+    });
     const progress = await notifier.sendGenerationProgress(job.data.userTelegramId).catch(() => undefined);
     const spec = getFormatSpec(generation.format);
     const modernization = modernizationMeta(generation.providerMeta);
@@ -195,6 +202,12 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
             raw: result.raw
           }
         });
+        await trackProductEvent({
+          name: "generation_succeeded",
+          userId: generation.userId,
+          projectId: generation.projectId ?? undefined,
+          generationId: generation.id
+        });
         persistedSuccess = true;
         if (generation.projectId) {
           await markProjectStatus(prisma, generation.projectId, projectStatusAfterGeneration("SUCCEEDED"));
@@ -219,11 +232,26 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
         throw error;
       }
       if (isFinalAttempt(job)) {
-        await markGenerationFailed(prisma, generation.id, error instanceof Error ? error.message : "Unknown error");
+        const failedGeneration = await markGenerationFailed(
+          prisma,
+          generation.id,
+          error instanceof Error ? error.message : "Unknown error"
+        );
+        await trackProductEvent({
+          name: "generation_failed",
+          userId: generation.userId,
+          projectId: generation.projectId ?? undefined,
+          generationId: generation.id,
+          metadata: { stage: "generation" }
+        });
         if (generation.projectId) {
           await markProjectStatus(prisma, generation.projectId, projectStatusAfterGeneration("FAILED"));
         }
-        await notifier.sendGenerationFailure(job.data.userTelegramId);
+        await notifier.sendGenerationFailure(
+          job.data.userTelegramId,
+          generation.projectId,
+          failedGeneration.creditCost > 0
+        );
       }
       throw error;
     } finally {
@@ -263,13 +291,16 @@ const hookWorker = new Worker<HookJobData, void, string>(
       throw new Error(`Project ${job.data.projectId} was not found.`);
     }
 
+    const progress = await notifier.sendHookProgress(job.data.userTelegramId).catch(() => undefined);
     try {
       await withJobDeadline("Hook job", positiveIntegerEnv("HOOK_JOB_TIMEOUT_MS", 10 * 60 * 1000), async (signal) => {
         await markProjectStatus(prisma, project.id, "HOOKS_PENDING");
+        await notifier.updateHookProgress(progress, "Изучаю источник и выделяю главную мысль");
         const transcript = await ensureProjectTranscript(project, signal);
         throwIfAborted(signal, "Hook job");
         const textForHooks = transcript ?? "Пользователь загрузил видео без транскрипта.";
         const designText = deriveDesignTextConstraints(project.selectedTemplate ?? project.selectedUserStyleAsset ?? undefined);
+        await notifier.updateHookProgress(progress, "Подбираю короткие варианты под выбранный шаблон");
         const hooks = await promptPlanner.generateHooks({
           transcript: textForHooks,
           platform: project.platform ?? "YOUTUBE",
@@ -281,12 +312,22 @@ const hookWorker = new Worker<HookJobData, void, string>(
         throwIfAborted(signal, "Hook job");
         const savedHooks = await replaceProjectHooks(prisma, project.id, hooks);
         await markProjectStatus(prisma, project.id, "HOOKS_READY");
+        await trackProductEvent({
+          name: "hooks_ready",
+          userId: project.userId,
+          projectId: project.id,
+          metadata: { candidateCount: savedHooks.length }
+        });
         await notifier.sendHookCandidates(job.data.userTelegramId, project.id, savedHooks);
       });
     } catch (error) {
-      await markProjectStatus(prisma, project.id, "FAILED", error instanceof Error ? error.message : "Unknown error");
-      await notifier.sendHookFailure(job.data.userTelegramId);
+      if (isFinalAttempt(job)) {
+        await markProjectStatus(prisma, project.id, "FAILED", error instanceof Error ? error.message : "Unknown error");
+        await notifier.sendHookFailure(job.data.userTelegramId, project.id);
+      }
       throw error;
+    } finally {
+      await notifier.finishHookProgress(progress);
     }
   },
   buildWorkerOptions({
@@ -326,6 +367,12 @@ async function ensureProjectTranscript(project: NonNullable<Awaited<ReturnType<t
 
   await markProjectStatus(prisma, project.id, "SOURCE_READY");
   return result.text;
+}
+
+async function trackProductEvent(input: Parameters<typeof recordProductEvent>[1]) {
+  await recordProductEvent(prisma, input).catch((error) => {
+    console.warn("Product analytics event was not recorded", { name: input.name, error });
+  });
 }
 
 type WorkerGeneration = NonNullable<Awaited<ReturnType<typeof findGeneration>>>;
