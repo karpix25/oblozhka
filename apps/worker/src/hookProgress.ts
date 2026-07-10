@@ -1,22 +1,21 @@
-import { renderProgressChecklist } from "./progressChecklist.js";
+import {
+  INITIAL_PROGRESS_DOT_FRAME,
+  renderAnimatedStatus,
+  type ProgressDotFrame
+} from "./animatedStatus.js";
 
 export type HookProgressStage = "source" | "generation" | "selection" | "ready";
 
-const HOOK_PROGRESS_STEPS: Array<{ stage: HookProgressStage; label: string }> = [
-  { stage: "source", label: "Изучаю источник и извлекаю содержание" },
-  { stage: "generation", label: "Анализирую смысл и создаю CTR-варианты" },
-  { stage: "selection", label: "Сравниваю варианты и выбираю лучший текст" },
-  { stage: "ready", label: "Текст для обложки выбран" }
-];
+const HOOK_PROGRESS_LABELS: Record<Exclude<HookProgressStage, "ready">, string> = {
+  source: "Изучаю источник и извлекаю содержание",
+  generation: "Анализирую смысл и создаю варианты текста",
+  selection: "Сравниваю варианты и выбираю лучший текст"
+};
 
-export function hookProgressText(stage: HookProgressStage) {
-  return renderProgressChecklist({
-    stage,
-    completedStage: "ready",
-    activeTitle: "⏳ Подбираю текст для обложки",
-    completedTitle: "✅ Текст для обложки готов",
-    activeFooter: "Можно закрыть Telegram — это сообщение будет обновляться автоматически.",
-    completedFooter: "Следующий шаг отправлен отдельным сообщением.",
-    steps: HOOK_PROGRESS_STEPS
-  });
+export function hookProgressText(
+  stage: HookProgressStage,
+  frame: ProgressDotFrame = INITIAL_PROGRESS_DOT_FRAME
+) {
+  if (stage === "ready") return "✅ Текст для обложки готов.";
+  return renderAnimatedStatus(HOOK_PROGRESS_LABELS[stage], frame);
 }

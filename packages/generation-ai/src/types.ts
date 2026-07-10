@@ -1,4 +1,5 @@
 import type { WizardInput } from "@covers/domain";
+import type { ContentLanguage } from "./contentLanguage.js";
 
 export type PromptPlan = {
   prompt: string;
@@ -25,6 +26,7 @@ export type PromptPlanningInput = {
   wizard: WizardInput;
   formatDescription: string;
   aspectRatio: string;
+  contentLanguage?: ContentLanguage;
   template?: {
     slug?: string | null;
     title?: string | null;

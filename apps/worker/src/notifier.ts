@@ -2,6 +2,7 @@ import { MODERNIZATION_ACTIONS, modernizationActionLabel, type PaidPlan } from "
 import { Bot, InputFile } from "grammy";
 import { generationProgressText, type GenerationProgressStage } from "./generationProgress.js";
 import { hookProgressText, type HookProgressStage } from "./hookProgress.js";
+import { ProgressAnimator, type ProgressMessage } from "./progressAnimator.js";
 
 type GenerationDelivery = {
   generationId: string;
@@ -12,19 +13,20 @@ type GenerationDelivery = {
   originalBytes?: Buffer;
 };
 
-export type GenerationProgressMessage = {
-  chatId: number;
-  messageId: number;
-};
+export type GenerationProgressMessage = ProgressMessage;
 
 export class TelegramNotifier {
   private readonly bot: Bot;
+  private readonly progressAnimator: ProgressAnimator;
 
   constructor(token = process.env.BOT_TOKEN ?? "") {
     if (!token) {
       throw new Error("BOT_TOKEN is required for worker notifications.");
     }
     this.bot = new Bot(token);
+    this.progressAnimator = new ProgressAnimator(async (progress, text) => {
+      await this.bot.api.editMessageText(progress.chatId, progress.messageId, text);
+    });
   }
 
   async sendGenerationResult(chatId: number, delivery: GenerationDelivery) {
@@ -50,16 +52,25 @@ export class TelegramNotifier {
 
   async sendGenerationProgress(chatId: number) {
     const message = await this.bot.api.sendMessage(chatId, generationProgressText("references"));
-    return { chatId, messageId: message.message_id };
+    const progress = { chatId, messageId: message.message_id };
+    this.progressAnimator.start(progress, (frame) => generationProgressText("references", frame));
+    return progress;
   }
 
   async updateGenerationProgress(progress: GenerationProgressMessage | undefined, stage: GenerationProgressStage) {
     if (!progress) return;
-    await this.bot.api.editMessageText(progress.chatId, progress.messageId, generationProgressText(stage)).catch(() => undefined);
+    if (stage === "ready") {
+      await this.progressAnimator.stop(progress);
+      await this.editProgressMessage(progress, generationProgressText(stage));
+      return;
+    }
+    await this.progressAnimator.update(progress, (frame) => generationProgressText(stage, frame));
   }
 
   async finishGenerationProgress(progress: GenerationProgressMessage | undefined, completed = false) {
-    if (!progress || completed) return;
+    if (!progress) return;
+    await this.progressAnimator.stop(progress);
+    if (completed) return;
     await this.bot.api.deleteMessage(progress.chatId, progress.messageId).catch(() => undefined);
   }
 
@@ -94,12 +105,19 @@ export class TelegramNotifier {
 
   async sendHookProgress(chatId: number) {
     const message = await this.bot.api.sendMessage(chatId, hookProgressText("source"));
-    return { chatId, messageId: message.message_id };
+    const progress = { chatId, messageId: message.message_id };
+    this.progressAnimator.start(progress, (frame) => hookProgressText("source", frame));
+    return progress;
   }
 
   async updateHookProgress(progress: GenerationProgressMessage | undefined, stage: HookProgressStage) {
     if (!progress) return;
-    await this.bot.api.editMessageText(progress.chatId, progress.messageId, hookProgressText(stage)).catch(() => undefined);
+    if (stage === "ready") {
+      await this.progressAnimator.stop(progress);
+      await this.editProgressMessage(progress, hookProgressText(stage));
+      return;
+    }
+    await this.progressAnimator.update(progress, (frame) => hookProgressText(stage, frame));
   }
 
   async finishHookProgress(progress: GenerationProgressMessage | undefined, completed: boolean) {
@@ -120,6 +138,10 @@ export class TelegramNotifier {
         ]
       }
     });
+  }
+
+  private async editProgressMessage(progress: ProgressMessage, text: string) {
+    await this.bot.api.editMessageText(progress.chatId, progress.messageId, text).catch(() => undefined);
   }
 }
 

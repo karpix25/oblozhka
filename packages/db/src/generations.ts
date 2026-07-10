@@ -219,7 +219,23 @@ function isUniqueConflict(error: unknown) {
 }
 
 export async function findGeneration(db: DbClient, id: string) {
-  return db.generation.findUnique({ where: { id }, include: { user: true, guestFaceAsset: true, template: true, userStyleAsset: true } });
+  return db.generation.findUnique({
+    where: { id },
+    include: {
+      user: true,
+      guestFaceAsset: true,
+      template: true,
+      userStyleAsset: true,
+      project: {
+        include: {
+          transcripts: {
+            orderBy: { createdAt: "desc" },
+            take: 1
+          }
+        }
+      }
+    }
+  });
 }
 
 export async function listGenerations(db: DbClient) {

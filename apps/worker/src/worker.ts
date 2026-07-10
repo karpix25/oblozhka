@@ -23,7 +23,7 @@ import {
   type GenerationJobData,
   type HookJobData
 } from "@covers/domain";
-import { KieImageClient, OpenRouterPromptPlanner } from "@covers/generation-ai";
+import { KieImageClient, OpenRouterPromptPlanner, resolveContentLanguage } from "@covers/generation-ai";
 import { SourceIngestionService } from "@covers/media-source";
 import { ObjectStorage } from "@covers/storage";
 import { Worker } from "bullmq";
@@ -94,6 +94,13 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
     const progress = await notifier.sendGenerationProgress(job.data.userTelegramId).catch(() => undefined);
     const spec = getFormatSpec(generation.format);
     const modernization = modernizationMeta(generation.providerMeta);
+    const sourceTranscript = generation.project?.transcripts[0];
+    const contentLanguage = resolveContentLanguage(
+      sourceTranscript?.language,
+      [sourceTranscript?.cleanText, sourceTranscript?.rawText, generation.topic, generation.hookText]
+        .filter(Boolean)
+        .join("\n")
+    );
 
     try {
       await withJobDeadline("Generation job", positiveIntegerEnv("GENERATION_JOB_TIMEOUT_MS", 20 * 60 * 1000), async (signal) => {
@@ -128,6 +135,7 @@ const generationWorker = new Worker<GenerationJobData, void, string>(
           },
           formatDescription: spec.description,
           aspectRatio: spec.aspectRatio,
+          contentLanguage,
           template: generation.template
             ? {
                 slug: generation.template.slug,
@@ -306,11 +314,13 @@ const hookWorker = new Worker<HookJobData, void, string>(
         const transcript = await ensureProjectTranscriptSafely(project, signal);
         throwIfAborted(signal, "Hook job");
         const textForHooks = transcript ?? project.topicSummary ?? "видео";
+        const contentLanguage = resolveContentLanguage(project.transcripts[0]?.language, textForHooks);
         const designText = deriveDesignTextConstraints(project.selectedTemplate ?? project.selectedUserStyleAsset ?? undefined);
         await notifier.updateHookProgress(progress, "generation");
         const hooks = await promptPlanner.generateHooks({
           transcript: textForHooks,
           platform: project.platform ?? "YOUTUBE",
+          contentLanguage,
           theme: project.topicSummary ?? project.transcripts[0]?.cleanText?.slice(0, 300) ?? undefined,
           templateTitle: project.selectedTemplate?.title ?? project.selectedUserStyleAsset?.title ?? undefined,
           templateRules: project.selectedTemplate?.promptRules ?? project.selectedUserStyleAsset?.promptRules ?? undefined,

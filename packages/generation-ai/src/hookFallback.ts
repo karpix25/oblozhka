@@ -1,11 +1,19 @@
 import { countHookWords, normalizeHookText } from "./hookText.js";
 import type { HookCandidate, HookContext } from "./hookTypes.js";
+import { isRussianOnlyText, type ContentLanguage } from "./contentLanguage.js";
 
 const DEFAULT_MAX_WORDS = 5;
 
-export function buildFallbackHooks(context: HookContext, maxWords = DEFAULT_MAX_WORDS): HookCandidate[] {
-  const keywords = context.keywords;
-  const primary = keywords[0] ?? extractThemeFallback(context.theme) ?? extractTranscriptFallback(context.transcript);
+export function buildFallbackHooks(
+  context: HookContext,
+  maxWords = DEFAULT_MAX_WORDS,
+  contentLanguage: ContentLanguage = "other"
+): HookCandidate[] {
+  const requireRussian = contentLanguage === "ru";
+  const keywords = requireRussian ? context.keywords.filter(isRussianOnlyText) : context.keywords;
+  const theme = requireRussian && !isRussianOnlyText(context.theme ?? "") ? undefined : context.theme;
+  const transcript = requireRussian ? russianTranscriptText(context.transcript) : context.transcript;
+  const primary = keywords[0] ?? extractThemeFallback(theme) ?? extractTranscriptFallback(transcript);
   const secondary = keywords.find((keyword) => keyword !== primary) ?? "разбор";
   const number = context.numbers[0];
   const hooks = [
@@ -21,6 +29,10 @@ export function buildFallbackHooks(context: HookContext, maxWords = DEFAULT_MAX_
     angle: ["specific", "reason", "mistake", "analysis", "contrast"][index],
     score: 70 - index * 5
   }));
+}
+
+function russianTranscriptText(transcript: string) {
+  return transcript.match(/[А-Яа-яЁё]+/g)?.join(" ") ?? "тема ролика";
 }
 
 function fitHookText(text: string, maxWords: number): string {

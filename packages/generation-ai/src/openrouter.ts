@@ -5,6 +5,17 @@ import type { HookCandidate, HookContext } from "./hookTypes.js";
 import { normalizeAndRankHooks } from "./hookValidation.js";
 import { repairImagePrompt, validateImagePrompt } from "./promptValidator.js";
 import { referenceRoleContract } from "./referenceContract.js";
+import {
+  isRussianOnlyText,
+  resolveContentLanguage,
+  type ContentLanguage
+} from "./contentLanguage.js";
+import {
+  fallbackVisualLanguageRule,
+  hookLanguageGuide,
+  promptContentLanguage,
+  visualLanguageGuide
+} from "./languagePrompt.js";
 import type { PromptPlan, PromptPlanningInput } from "./types.js";
 
 type OpenRouterMessage = {
@@ -84,6 +95,7 @@ export class OpenRouterPromptPlanner {
   async generateHooks(input: {
     transcript: string;
     platform: string;
+    contentLanguage?: ContentLanguage;
     theme?: string;
     templateTitle?: string;
     templateRules?: string;
@@ -96,9 +108,10 @@ export class OpenRouterPromptPlanner {
   }, options: OpenRouterRequestOptions = {}): Promise<HookCandidate[]> {
     const hookContext = buildHookContext({ transcript: input.transcript, theme: input.theme });
     const maxWords = input.designText?.maxWords ?? deriveMaxHookWords(input.templateRules);
+    const contentLanguage = resolveContentLanguage(input.contentLanguage, input.transcript);
 
     if (!this.apiKey) {
-      return this.fallbackHooks(hookContext, maxWords);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
     }
 
     let response: Awaited<ReturnType<typeof fetchOpenRouterText>>;
@@ -126,7 +139,7 @@ export class OpenRouterPromptPlanner {
                 role: "user",
                 content: [
                   "Верни JSON: {\"hooks\":[{\"text\":\"...\",\"angle\":\"...\",\"score\":90}]}",
-                  "Нужно 5 коротких русских hook-текстов для обложки. Первый хук должен быть лучшим вариантом для реальной генерации.",
+                  hookLanguageGuide(contentLanguage),
                   "Оценивай score как прогноз CTR: конкретика, любопытство, визуальная читаемость, связь с темой ролика, сила конфликта.",
                   "До 5 слов, крупно читается в превью, усиливает конфликт/интригу и не требует объяснений.",
                   "Каждый хук должен опираться на конкретику из ролика: объект, цифру, цену, ошибку, контраст, результат, потерю, выигрыш, скрытую причину или до/после.",
@@ -158,37 +171,41 @@ export class OpenRouterPromptPlanner {
       );
     } catch (error) {
       if (options.signal?.aborted) throw error;
-      return this.fallbackHooks(hookContext, maxWords);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
     }
 
     if (!response.ok) {
-      return this.fallbackHooks(hookContext, maxWords);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
     }
 
     let json: { choices?: Array<{ message?: { content?: string } }> };
     try {
       json = JSON.parse(response.text) as { choices?: Array<{ message?: { content?: string } }> };
     } catch {
-      return this.fallbackHooks(hookContext, maxWords);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
     }
     const content = json.choices?.[0]?.message?.content;
-    if (!content) return this.fallbackHooks(hookContext, maxWords);
+    if (!content) return this.fallbackHooks(hookContext, maxWords, contentLanguage);
 
     try {
       const parsed = JSON.parse(content) as { hooks?: Array<{ text?: string; angle?: string; score?: number }> };
       const rawHooks = parsed.hooks
         ?.filter((hook) => hook.text)
         .map((hook) => ({ text: hook.text!, angle: hook.angle, score: hook.score ?? 0 }));
-      const hooks = normalizeAndRankHooks(rawHooks ?? [], { context: hookContext, maxWords });
-      return hooks.length ? hooks : this.fallbackHooks(hookContext, maxWords);
+      const languageMatchedHooks = contentLanguage === "ru"
+        ? rawHooks?.filter((hook) => isRussianOnlyText(hook.text))
+        : rawHooks;
+      const hooks = normalizeAndRankHooks(languageMatchedHooks ?? [], { context: hookContext, maxWords });
+      return hooks.length ? hooks : this.fallbackHooks(hookContext, maxWords, contentLanguage);
     } catch {
-      return this.fallbackHooks(hookContext, maxWords);
+      return this.fallbackHooks(hookContext, maxWords, contentLanguage);
     }
   }
 
   private messages(input: PromptPlanningInput): OpenRouterMessage[] {
     const templateGuide = this.templateGuide(input);
     const roleContract = referenceRoleContract(input);
+    const contentLanguage = promptContentLanguage(input);
     const userContent: OpenRouterMessage["content"] = [
       {
         type: "text",
@@ -214,7 +231,8 @@ export class OpenRouterPromptPlanner {
           "Шаблон и пользовательский стиль не являются источником личности: нельзя брать с них черты лица, волосы, возраст, выражение, этничность или персональное сходство.",
           "Промпт должен явно описать layout zones, typography/font feel, text placement, subject/object placement, foreground/background depth, color accents.",
           "Не копируй чужой дизайн один-в-один. Бери только композицию, настроение, контраст и читаемость.",
-          "Промпт должен требовать крупный фокусный объект, чистую композицию, русский текст без ошибок, коммерческий thumbnail-look.",
+          visualLanguageGuide(contentLanguage),
+          "Промпт должен требовать крупный фокусный объект, чистую композицию и коммерческий thumbnail-look.",
           "Запрещено менять выбранный стиль на другой формат композиции."
         ].join("\n")
       }
@@ -280,14 +298,15 @@ export class OpenRouterPromptPlanner {
         faceRule,
         input.wizard.guestReferenceImageUrl ? "Use the second uploaded face as a separate guest/person in the composition." : "",
         "Template/style references control layout and design only; do not borrow facial features from them.",
+        fallbackVisualLanguageRule(promptContentLanguage(input)),
         input.wizard.hookText ? `Large readable Russian cover text: "${input.wizard.hookText}".` : "No unnecessary text.",
         "Bold focal subject, clean background, strong contrast, readable at small size, no watermarks."
       ].join("\n");
     return this.validatedPlan(prompt, input, undefined, "fallback");
   }
 
-  private fallbackHooks(context: HookContext, maxWords?: number): HookCandidate[] {
-    return buildFallbackHooks(context, maxWords);
+  private fallbackHooks(context: HookContext, maxWords: number | undefined, contentLanguage: ContentLanguage): HookCandidate[] {
+    return buildFallbackHooks(context, maxWords, contentLanguage);
   }
 
   private templateGuide(input: PromptPlanningInput) {
