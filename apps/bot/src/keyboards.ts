@@ -11,7 +11,6 @@ export function mainKeyboard(access?: BillingAccess) {
     .text(customStyleMenuLabel(access), "styles:mine")
     .row()
     .text("🖼 Шаблоны", "templates:library")
-    .text("📁 Мои проекты", "projects:mine")
     .row()
     .text("🖼 Мои обложки", "covers:mine")
     .text("💎 Баланс", "balance")
@@ -48,8 +47,6 @@ export function platformKeyboard() {
     .text("▶️ YouTube · 16:9", "platform:YOUTUBE")
     .row()
     .text("📱 Reels/TikTok · 9:16", "platform:INSTAGRAM_TIKTOK")
-    .row()
-    .text("🎭 Без лица · 16:9", "platform:FACELESS")
     .row()
     .text("⬅️ Назад", "project:back:source")
     .text("🏠 В начало", "home");

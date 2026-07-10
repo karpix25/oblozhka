@@ -84,7 +84,6 @@ function templateGalleryKeyboard(input: {
     keyboard
       .text(platformTab("▶️ YouTube", input.platform === "YOUTUBE"), "templates:browse:YOUTUBE:0")
       .text(platformTab("📱 Reels/TikTok", input.platform === "INSTAGRAM_TIKTOK"), "templates:browse:INSTAGRAM_TIKTOK:0")
-      .text(platformTab("🎭 Без лица", input.platform === "FACELESS"), "templates:browse:FACELESS:0")
       .row();
   }
 
