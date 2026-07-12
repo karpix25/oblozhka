@@ -24,16 +24,16 @@ const FRAMEWORK_SIGNALS: Record<ThumbnailHookFramework, readonly RegExp[]> = {
     /(скрыт|причин|почему|из-за|меша|не\s+работает|reason|hidden|why)/iu
   ],
   counterintuitive: [
-    /(наоборот|вопреки|не\s+так|миф|ошибал|реальность|actually|wrong|myth)/iu
+    /(наоборот|вопреки|не\s+так|миф|ошибал|реальность|один\s+разработчик|actually|wrong|myth)/iu
   ],
   specific_result: [
     /(\d|%|результ|вырос|упал|лид|продаж|час|дней|result|growth|saved)/iu
   ],
   stakes: [
-    /(риск|потер|без\s+\p{L}+|цена|угроз|дедлайн|поздно|risk|stakes|deadline)/iu
+    /(риск|потер|без\s+\p{L}+|цена|угроз|дедлайн|поздно|слежк|risk|stakes|deadline)/iu
   ],
   object_proof: [
-    /(\d|экран|документ|таблиц|инструмент|воронк|заявк|лид|метрик|чек|screen|tool|proof)/iu
+    /(\d|экран|документ|таблиц|инструмент|воронк|заявк|лид|метрик|чек|взломан|интернет|разработчик|устройств|screen|tool|proof)/iu
   ],
   visual_pair: [
     /(до\s+и\s+после|против|vs|ожидани|реальность|стар|нов|было|стало|before|after|versus)/iu

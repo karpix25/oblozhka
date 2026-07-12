@@ -82,6 +82,28 @@ test("Russian hook fallback excludes English words from a mixed transcript", asy
   assert.ok(hooks.every((hook) => !/[A-Za-z]/.test(hook.text)));
 });
 
+test("Russian hook fallback keeps short hooks grammatical and contextual", async () => {
+  const planner = new OpenRouterPromptPlanner({ apiKey: "" });
+  const hooks = await planner.generateHooks({
+    transcript: [
+      "Рассказ номер девять называется Весь мир уже взломан.",
+      "13 лет назад я познакомился с аналитическими системами.",
+      "Идея была сделать нечто, что видит весь интернет.",
+      "Устройства с Wi-Fi могут быть системой слежки.",
+      "CVE Global разработал один человек на базе искусственного интеллекта."
+    ].join(" "),
+    platform: "YOUTUBE",
+    contentLanguage: "ru",
+    templateRules: "Max 2 words"
+  });
+
+  assert.equal(hooks.length, 5);
+  assert.ok(hooks.every((hook) => !/[A-Za-z]/.test(hook.text)));
+  assert.ok(hooks.every((hook) => !/\b(?:13 В|13 ОШИБКА|ЕСТЬ)\b/u.test(hook.text)));
+  assert.ok(hooks.every((hook) => hook.text.split(/\s+/).length >= 2));
+  assert.ok(hooks.some((hook) => /ВЗЛОМАННЫЙ ИНТЕРНЕТ|СКРЫТАЯ СЛЕЖКА|ОДИН РАЗРАБОТЧИК/u.test(hook.text)));
+});
+
 async function withFetch<T>(fetcher: typeof fetch, action: () => Promise<T>): Promise<T> {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetcher;

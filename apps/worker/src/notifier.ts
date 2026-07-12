@@ -89,18 +89,27 @@ export class TelegramNotifier {
 
   async sendAutoHookReady(chatId: number, projectId: string, hookText?: string | null) {
     await this.bot.api.sendMessage(chatId, [
-      "Текст для обложки выбран автоматически.",
+      "Текст для обложки выбран автоматически — одобрять его не нужно.",
       hookText ? `Хук: ${hookText}` : "Я взял самый сильный CTR-вариант под выбранный шаблон.",
       "",
-      "Теперь выберите сохранённое лицо или загрузите новое фото — после этого сразу начну генерацию."
+      "Осталось выбрать или загрузить референс — после этого сразу начну генерацию."
     ].join("\n"), {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🚀 Перейти к фото · 1 генерация", callback_data: `referenceface:choose:${projectId}` }],
+          [{ text: "🚀 Перейти к референсу · 1 генерация", callback_data: `referenceface:choose:${projectId}` }],
           [{ text: "⬅️ Выбрать другой шаблон", callback_data: `project:change-template:${projectId}` }]
         ]
       }
     });
+  }
+
+  async sendAutoGenerationQueued(chatId: number, hookText?: string | null) {
+    await this.bot.api.sendMessage(chatId, [
+      "Текст для обложки выбран автоматически.",
+      hookText ? `Хук: ${hookText}` : "Я взял самый сильный CTR-вариант под выбранный шаблон.",
+      "",
+      "Одобрять текст не нужно — сразу собираю обложку с этим хуком."
+    ].join("\n"));
   }
 
   async sendHookProgress(chatId: number) {

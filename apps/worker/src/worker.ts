@@ -27,6 +27,7 @@ import { KieImageClient, OpenRouterPromptPlanner, resolveContentLanguage } from 
 import { SourceIngestionService } from "@covers/media-source";
 import { ObjectStorage } from "@covers/storage";
 import { Worker } from "bullmq";
+import { startProjectGenerationAfterHook } from "./autoProjectGeneration.js";
 import { processFaceCardJob } from "./faceCardProcessor.js";
 import { prepareGenerationReferences } from "./generationReferences.js";
 import { createPreview, normalizeFinal } from "./imageProcessing.js";
@@ -331,7 +332,6 @@ const hookWorker = new Worker<HookJobData, void, string>(
         await notifier.updateHookProgress(progress, "selection");
         const savedHooks = await replaceProjectHooks(prisma, project.id, hooks);
         const selectedProject = await selectBestProjectHook(prisma, project.id);
-        await markProjectStatus(prisma, project.id, "HOOKS_READY");
         await trackProductEvent({
           name: "hooks_ready",
           userId: project.userId,
@@ -344,8 +344,16 @@ const hookWorker = new Worker<HookJobData, void, string>(
           projectId: project.id,
           metadata: { mode: "auto_worker", hookId: selectedProject.selectedHook?.id }
         });
+        const autoGeneration = await startAutoGenerationSafely(project.id, job.data.userTelegramId, selectedProject.selectedHook?.text);
+        if (autoGeneration.status !== "queued") {
+          await markProjectStatus(prisma, project.id, "HOOKS_READY");
+        }
         await notifier.updateHookProgress(progress, "ready");
-        await notifier.sendAutoHookReady(job.data.userTelegramId, project.id, selectedProject.selectedHook?.text);
+        if (autoGeneration.status === "queued") {
+          await notifier.sendAutoGenerationQueued(job.data.userTelegramId, autoGeneration.hookText);
+        } else {
+          await notifier.sendAutoHookReady(job.data.userTelegramId, project.id, selectedProject.selectedHook?.text);
+        }
         hookProgressCompleted = true;
       });
     } catch (error) {
@@ -417,6 +425,15 @@ async function trackProductEvent(input: Parameters<typeof recordProductEvent>[1]
   await recordProductEvent(prisma, input).catch((error) => {
     console.warn("Product analytics event was not recorded", { name: input.name, error });
   });
+}
+
+async function startAutoGenerationSafely(projectId: string, userTelegramId: number, hookText?: string | null) {
+  try {
+    return await startProjectGenerationAfterHook({ projectId, userTelegramId });
+  } catch (error) {
+    console.warn("Auto generation after hook selection was not started", { projectId, error });
+    return { status: "not-ready" as const, hookText, reason: "auto_generation_failed" };
+  }
 }
 
 type WorkerGeneration = NonNullable<Awaited<ReturnType<typeof findGeneration>>>;
